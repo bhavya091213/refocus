@@ -26,3 +26,6 @@ report/*.xdv
 report/*.fls
 
 __pycache__/
+
+# python envs
+.venv*/

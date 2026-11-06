@@ -106,7 +106,20 @@ Checkpoint released by authors & 200{,}000 steps\\
 \emph{midsize undistorted} ($896\times640$, centre camera only). Training and testing in the code use the midsize variant.
 We use only this variant: it is the smallest, and it is the one the released code expects (\texttt{RigCenter*} folders with exactly nine \texttt{.jpg} files).
 Train/test scene lists are in \texttt{splits/*.pkl}; the test split has 164 scenes (from the metric script).
-\todo{number of train scenes, total size on disk, capture device, licence}
+\textbf{What we downloaded and verified.} The file \texttt{scenes\_merged\_midsize\_undistorted\_RigCenter.zip} (943.8\,MB on the share, 7.3\,GB extracted)
+contains 1{,}643 scene folders and 14{,}764 JPEGs, each $640\times896$ (width $\times$ height).
+Of these, 1{,}638 scenes have all nine focal positions; five folders are incomplete (1, 2, 4, 7 and 8 frames) and belong to no split, so they are never used.
+The split files (\texttt{train\_scenes.pkl}, \texttt{test\_scenes.pkl}) are byte-identical between the repository and the \texttt{splits.zip} on the share:
+\textbf{1{,}474 training scenes and 164 test scenes, with no overlap}, all complete. Scenes are dated across 17 capture days between August and December 2024.
+\todo{capture device, licence of the dataset}
+
+\textbf{Preprocessing log (everything we did to the data).}
+\begin{enumerate}[noitemsep]
+  \item Downloaded the single \texttt{midsize\_undistorted\_RigCenter} archive and \texttt{splits.zip} (the full-size and DNG archives are 17--51\,GB each and are not used).
+  \item Verified frame counts and split membership per scene (script \texttt{scripts/dataset\_stats.py}).
+  \item \textbf{Windows file-name issue:} scene names contain a colon (\texttt{GMT-05:00}), which Windows replaces with an underscore on extraction, so split lists no longer match folder names on a Windows machine. We therefore extract on the Linux training machine, where the names are preserved.
+  \item No other modification: no cropping, no colour change, no augmentation beyond what the training code does (resize to $640\times896$, which is a no-op here, and scaling to $[-1,1]$).
+\end{enumerate}
 
 \textbf{Preprocessing (from \texttt{FocalStackDataset}).}
 \begin{enumerate}[noitemsep]
