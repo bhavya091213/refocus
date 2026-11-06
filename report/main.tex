@@ -132,28 +132,72 @@ Note that the dataset class resizes with plain \texttt{PIL.resize}; the images a
 \todo{augmentation: none observed in code; confirm}
 
 \section{Experiments}
-\subsection{Baseline: authors' released checkpoint}
-We run the 200k-step checkpoint (\texttt{tedlasai/learn2refocus} on Hugging Face, 15.4\,GB) on the test split. \tbd
+\subsection{Evaluation protocol (identical for every model)}
+\textbf{Test subset.} Running the full test set (164 scenes $\times$ 9 input positions $=1{,}476$ generations at about 65\,s each on an A100) would take roughly 26 GPU-hours per model, so we use a fixed subset: every 8th scene of the sorted test list, first 20 scenes, with the \emph{input photo} at positions $\{1,4,7\}$ (near, middle, far). That is 60 generations per model, each producing 9 frames.
+\textbf{Metrics.} For each generation we compare the 8 output frames \emph{other than the input position} (the input frame is copied) with the real photo at the same focus position: PSNR and SSIM (torchmetrics, data range 1), LPIPS (VGG backbone, as in the authors' script). FID and VIF from the authors' script are not reported because 60 generations are too few for a reliable FID. We add one label-free metric from Section~\ref{sec:depth}: the \emph{depth-consistency score}, the Spearman correlation between the sharpest-frame index per pixel and monocular disparity (Depth Anything V2 Small on the real middle frame); more negative is better, and the real stacks score about $-0.80$ on 16 scenes (Section~\ref{sec:depth}).
+\textbf{Uncertainty.} Standard errors over the 480 frame-level scores are reported; they treat frames as independent, which they are not (frames of one generation are correlated), so differences smaller than about two standard errors should not be read as real.
 
-\subsection{Our fine-tune and the ablation}
-The training script already supports several conditioning modes (\texttt{conditioning:} in the YAML):
-\texttt{random}, \texttt{zero}, \texttt{ablate\_position}, \texttt{ablate\_time}, \texttt{ablate\_single\_frame}, \texttt{random\_single\_double\_triple}.
-An \emph{ablation} changes exactly one factor while keeping data, steps, seed and hyperparameters identical, so any difference in quality is attributable to that factor.
-\todo{choose the compared modes, e.g.\ \texttt{random} vs.\ \texttt{ablate\_position}; document what each does after reading the code in detail}
+\subsection{Baseline: authors' released checkpoint}
+We run the authors' 200{,}000-step checkpoint (\texttt{tedlasai/learn2refocus} on Hugging Face, 15.4\,GB) with the same protocol. It is the reference ceiling: our models see a small fraction of its training.
+
+\subsection{Our fine-tunes and the ablation}\label{sec:ablation}
+The training script supports several conditioning modes (\texttt{conditioning:} in the YAML). An \emph{ablation} changes exactly one factor while keeping data, steps, seed and hyperparameters identical, so any quality difference is attributable to that factor. We compare three modes that differ only in how the input photo and its focus position are shown to the network:
+\begin{table}[h]\centering
+\caption{The three arms. Everything else is identical.}
+\begin{tabular}{p{2.6cm}p{9.4cm}}\toprule
+Mode & What the network receives\\\midrule
+A: \texttt{random} (paper) & Input latent in slot $k$ of 9, other slots zero; the slot index tells the network the input's focus position.\\
+B: \texttt{ablate\_position} & Input latent copied into \emph{all} 9 slots: no position signal. The network must infer how blurred the input is from the image itself.\\
+C: \texttt{ablate\_time} & Same copy into all slots, but $k$ is passed through the \texttt{motion\_bucket\_id} scalar: position is known, encoded differently.\\
+\bottomrule\end{tabular}\end{table}
+We read the inference code (\texttt{svd\_pipeline.py}) to confirm that inference treats the three modes exactly as training does. \textbf{Questions:} (A vs B) does knowing the input's focus position help? (A vs C) does \emph{how} the position is encoded matter?
+
+\textbf{Training protocol (ours).} Start from the SVD base weights; train only the temporal transformer blocks (Section~3); AdamW, learning rate $10^{-5}\times$ the repository's \texttt{scale\_lr} factor of 2 $=2\times10^{-5}$; per-GPU batch 1 on 2 GPUs with data parallelism (global batch 2); bf16 mixed precision with gradient checkpointing; seed 0; 4{,}000 optimiser steps $=8{,}000$ samples, about 5.4 passes over the 1{,}474 training scenes. The three arms train simultaneously on separate GPU pairs.
+\textbf{Deviations from the authors' training} (stated so the comparison is honest): bf16 and gradient checkpointing (fp32 without checkpointing ran out of memory on a 40\,GB GPU in our test); 4{,}000 steps versus their 200{,}000 (2\%); their hardware and batch size are not stated in the repository; no EMA; their in-training validation was disabled (it crashes under bf16) and we evaluate separately.
 
 \begin{table}[h]\centering
-\caption{Test-set metrics (mean over 164 scenes). \tbd}
-\begin{tabular}{lccccc}\toprule
-Model & PSNR$\uparrow$ & SSIM$\uparrow$ & LPIPS$\downarrow$ & FID$\downarrow$ & VIF$\uparrow$\\\midrule
-Authors' 200k ckpt & \tbd & \tbd & \tbd & \tbd & \tbd\\
-Ours, mode A & \tbd & \tbd & \tbd & \tbd & \tbd\\
-Ours, mode B & \tbd & \tbd & \tbd & \tbd & \tbd\\
-\bottomrule\end{tabular}
-\end{table}
-Metrics follow the authors' \texttt{extra/compute\_metrics.py}: PSNR, SSIM, LPIPS (VGG), FID and VIF, computed for every (input position, output position) pair.
+\caption{Test-subset results (20 scenes $\times$ input positions 1, 4, 7; 8 non-input frames each; mean $\pm$ s.e.). \tbd}\label{tab:results}
+\begin{tabular}{lcccc}\toprule
+Model & PSNR$\uparrow$ & SSIM$\uparrow$ & LPIPS$\downarrow$ & depth-$\rho$ ($\downarrow$)\\\midrule
+Authors' 200k checkpoint & \tbd & \tbd & \tbd & \tbd\\
+A: \texttt{random} (ours, 4k steps) & \tbd & \tbd & \tbd & \tbd\\
+B: \texttt{ablate\_position} (ours) & \tbd & \tbd & \tbd & \tbd\\
+C: \texttt{ablate\_time} (ours) & \tbd & \tbd & \tbd & \tbd\\
+Real stacks (reference) & -- & -- & -- & \tbd\\
+\bottomrule\end{tabular}\end{table}
+
+\subsection{Pipeline check}
+Before training we ran the full evaluation on the authors' checkpoint with 2 scenes $\times$ 3 positions (6 generations) as a smoke test: PSNR 32.7, SSIM 0.934, LPIPS 0.195, depth-consistency $-0.21$ (real stacks of those 2 scenes: $-0.52$). With so few scenes these numbers only show that the pipeline works.
 
 \subsection{Compute budget}
-\tbd{GPU type, hours, cost per run, total spent versus the \$100 cap}
+Training and evaluation run on one 8$\times$A100-40\,GB cloud instance at \$15.92/h (\$1.99 per GPU-hour, the same rate as a single GPU, so parallelism buys speed, not cheaper compute). Earlier single-GPU benchmarking measured 1.71\,s per step with bf16 and checkpointing and a 37.8\,GB peak. \tbd{total hours and dollars spent, against the \$100 cap}
+
+\section{Synthetic demo: refocusing Blender scenes with known optics}\label{sec:blender}
+\textbf{Motivation.} The real dataset has no ground-truth optics. For a demo we built depth-layered scenes in Blender 4.5 (Cycles, thin-lens depth of field, 640$\times$896, 48 samples with denoising) from public-domain (CC0) Poly Haven\footnote{\url{https://polyhaven.com}} models (rubber duck, apple, marble bust, potted plant, concrete cat statue, rocks, tree) and HDRI lighting (\texttt{studio\_small\_09}, \texttt{kloofendal\_48d\_partly\_cloudy\_puresky}). For each scene we render a true 9-frame focal stack by moving the camera's focus distance, give \emph{one} frame to the authors' released model, and compare its generated stack with the rendered one. We measure local sharpness (variance of the Laplacian) in a box around each object for every frame. \textbf{Important limitations:} the mapping from the phone's lens positions 0--8 to focus distances is not given, so every mapping below is our assumption; the renders are synthetic, so a domain shift from smartphone photos is unavoidable; and each result is one scene, one input frame, one sample.
+
+\textbf{Experiment 1: full-frame-style camera, f/1.4, distances 0.45--200\,m (guessed log spacing).} In thumbnails the model's stack looked nearly static. Measuring sharpness per object shows it \emph{does} sweep focus in near-to-far order, but its peaks are misplaced: for the bust the correlation between the ground-truth and model sharpness curves is $-0.14$, for the cat $0.20$ (input at position 2).
+
+\textbf{Experiment 2: weaker blur.} Rendering the same scene at f/4 raised the correlations to duck $0.32$, bust $0.46$ and cat $0.81$ (Figure~\ref{fig:sharp}), consistent with, but not proof of, the idea that our first renders had far more blur than smartphone photos. At f/8 even the ground-truth stack barely changes across positions, so that setting is uninformative.
+\begin{figure}[h]\centering\includegraphics[width=\linewidth]{sharp_curves.png}
+\caption{Sharpness per focus position at three objects, ground truth vs model (input at position 2, vertical dotted line). Top: f/1.4. Bottom: f/4.}\label{fig:sharp}\end{figure}
+
+\textbf{Experiment 3: phone-like macro scene.} The repository README says positions 0--8 correspond to lens positions 0--0.8, i.e.\ 5\,cm to infinity. \emph{Assuming} the spacing is linear in diopters, positions 4, 5, 6, 7 correspond to 10, 13.3, 20 and 40\,cm. We therefore rebuilt the scene at that scale (objects at 0.10, 0.133, 0.20 and 0.40\,m, camera with a 7\,mm sensor, 6\,mm lens, f/1.8), so that by construction the duck, apple, bust and cat are sharpest at positions 4, 5, 6 and 7. The duck's measurement box is dominated by background texture (its ground-truth curve has two peaks), so we discard the duck.
+\begin{table}[h]\centering
+\caption{Macro scene: sharpness-peak position, ground truth vs model (authors' checkpoint). ``Shift'' = model peak $-$ ground-truth peak.}\label{tab:macro}
+\begin{tabular}{lccccc}\toprule
+Input position & Object & GT peak & Model peak & Shift & Curve corr.\\\midrule
+4 & apple & 5 & 6 & $+1$ & 0.47\\
+4 & bust & 6 & 7 & $+1$ & 0.33\\
+4 & cat & 7 & 8 & $+1$ & 0.67\\
+6 & apple & 5 & 3 & $-2$ & 0.04\\
+6 & bust & 6 & 5 & $-1$ & 0.50\\
+6 & cat & 7 & 4 & $-3$ & $-0.29$\\
+\bottomrule\end{tabular}\end{table}
+With the input at position 4 the model's apple, bust and cat sharpen in the right order but consistently one position late (Figure~\ref{fig:macro}). With the input at position 6 the peaks fall \emph{early} and are no longer in depth order. So the macro-scale assumption did \textbf{not} remove the offset, and the offset changes sign with the input position: the model's behaviour on synthetic scenes is not a fixed calibration error that a different distance mapping would fix.
+\begin{figure}[h]\centering\includegraphics[width=\linewidth]{compare_macro_in4.jpg}
+\caption{Macro scene, input at position 4. Top: ground-truth stack (Blender). Middle: authors' model output from the single input photo (bottom, position 4).}\label{fig:macro}\end{figure}
+
+\textbf{Takeaway.} On synthetic scenes the released model produces a plausible near-to-far focus sweep but with a position error of one to three steps, and that error depends on the input position. We cannot separate a wrong distance-to-position assumption from the synthetic-to-real domain shift with this data; doing so would need real photos with known focus distances. For the live demo we therefore treat the Blender result as an illustration, not a benchmark.
 
 \section{Click-to-refocus interface}\label{sec:ui}
 Given the generated stack, define a local sharpness for frame $j$ at pixel $p$, e.g.\ the variance of the Laplacian in a window $W_p$:

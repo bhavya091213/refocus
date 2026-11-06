@@ -26,7 +26,17 @@ SCENES = {
         ("rock_moss_set_01", 0.8, -0.5, 0.18, 30), ("rubber_duck_toy", 0.6, 0.55, 0.13, 200),
         ("tree_small_02", 3.5, -0.45, 2.0, 0), ("marble_bust_01", 2.0, 0.35, 0.50, 20), ("potted_plant_02", 5.5, 0.4, 0.8, 0)]),
 }
+SCENES["macro"] = dict(hdri="studio_small_09", floor=(0.55, 0.42, 0.30), phone=True, items=[
+    ("rubber_duck_toy", 0.10, -0.45, 0.040, 20), ("food_apple_01", 0.133, 0.45, 0.035, 0),
+    ("marble_bust_01", 0.20, -0.05, 0.075, 20), ("concrete_cat_statue", 0.40, 0.45, 0.15, 20), ("potted_plant_02", 0.40, -0.5, 0.15, 0)])
 S = SCENES[a.scene]
+PHONE = S.get("phone", False)
+if PHONE:   # phone-like camera (small sensor, wide lens, f/1.8) and the README's position scale: 0..8 = 5 cm..infinity, ASSUMED linear in diopters
+    LENS, SENSOR, CAM_Z = 6.0, 7.0, 0.03
+    FOCUS = [1.0 / (20.0 * (1 - k / 8.0)) for k in range(8)] + [200.0]
+    if a.fstop == 1.4: a.fstop = 1.8
+else:
+    LENS, SENSOR, CAM_Z = 50.0, 36.0, 0.28
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
@@ -63,12 +73,13 @@ m = bpy.data.materials.new("floor"); m.use_nodes = True; m.node_tree.nodes["Prin
 m.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.6; fl.data.materials.append(m)
 
 # camera
-cam_z = 0.28
+cam_z = CAM_Z
 bpy.ops.object.camera_add(location=(0, 0, cam_z)); cam = bpy.context.object; sc.camera = cam
-cam.data.lens = 50; cam.data.sensor_fit = "VERTICAL"; cam.data.sensor_width = 36; cam.data.sensor_height = 36
+cam.data.lens = LENS; cam.data.sensor_fit = "VERTICAL"; cam.data.sensor_width = SENSOR; cam.data.sensor_height = SENSOR
 cam.rotation_euler = (math.radians(90 - 5), 0, 0)   # slight downward tilt
+cam.data.clip_start = 0.005; cam.data.clip_end = 1000.0
 cam.data.dof.use_dof = True; cam.data.dof.aperture_fstop = a.fstop
-half_w = math.tan(math.atan(18 / 50) * W / H)  # horizontal half-extent per metre of depth
+half_w = (SENSOR / 2 / LENS) * W / H  # horizontal half-extent per metre of depth
 
 def place(asset, depth, lat, height, yaw):
     before = set(bpy.data.objects)
@@ -90,7 +101,7 @@ def place(asset, depth, lat, height, yaw):
 for it in S["items"]: place(*it)
 
 # a key light so objects have some form independent of the HDRI
-bpy.ops.object.light_add(type="AREA", location=(-1.2, -0.3, 2.0)); L = bpy.context.object; L.data.energy = 200; L.data.size = 2.0
+bpy.ops.object.light_add(type="AREA", location=((-0.3, -0.1, 0.5) if PHONE else (-1.2, -0.3, 2.0))); L = bpy.context.object; L.data.energy = 15 if PHONE else 200; L.data.size = 0.5 if PHONE else 2.0
 L.rotation_euler = (math.radians(60), 0, math.radians(-25))
 
 os.makedirs(a.out, exist_ok=True)

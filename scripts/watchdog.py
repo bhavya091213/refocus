@@ -1,5 +1,5 @@
 """Terminate the Lambda instance when now > logs/deadline.txt (epoch). Extend by rewriting that file. Cost safety."""
-import json, time, urllib.request
+import json, os, time, urllib.request
 R = "D:/Refocus/"; B = "https://cloud.lambda.com/api/v1"
 key = open(R + "secrets/lambda.key").read().strip(); iid = open(R + "logs/instance_id.txt").read().strip()
 def call(path, body=None):
@@ -8,8 +8,14 @@ def call(path, body=None):
 while True:
     try:
         dl = int(open(R + "logs/deadline.txt").read())
-        if time.time() > dl:
-            print(time.ctime(), "DEADLINE -> terminating", iid, call("/instance-operations/terminate", {"instance_ids": [iid]}), flush=True); break
+        try: cap = float(open(R + "logs/cost_cap.txt").read())          # hard $ cap for THIS instance's spend (default 75)
+        except Exception: cap = 75.0
+        try: price = float(open(R + "logs/price_hr.txt").read())
+        except Exception: price = 1.99
+        cost = (time.time() - os.path.getmtime(R + "logs/launch.json")) / 3600 * price
+        if time.time() > dl or cost > cap:
+            why = "DEADLINE" if time.time() > dl else f"COST CAP ${cap:.0f} (spent ~${cost:.2f})"
+            print(time.ctime(), why, "-> terminating", iid, call("/instance-operations/terminate", {"instance_ids": [iid]}), flush=True); break
         d = call("/instances/" + iid)["data"]
         if d.get("status") == "terminated": print("instance gone, exiting", flush=True); break
     except Exception as e:

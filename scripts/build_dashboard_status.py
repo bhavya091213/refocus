@@ -103,22 +103,29 @@ STEPS.append(dict(title="Training benchmark: memory + step time", state="done", 
     files=F(put("s6", "remote_bench.sh", R + "scripts/remote_bench.sh"))))
 
 # 7 ---------------------------------------------------------------------------------------------------------
-STEPS.append(dict(title="Choose ablation", state="todo", note="recommended: random vs ablate_position (needs your pick)",
+STEPS.append(dict(title="Ablation chosen: random vs ablate_position vs ablate_time", state="done", note="3 arms, identical except `conditioning`",
     details="An ablation = change exactly ONE thing, keep data/steps/seed identical, so the quality gap is attributable to that thing.\n"
             "Modes already implemented in the authors' training script (conditioning:):\n"
             " • random (paper default): input latent in slot k, other slots zero -> position is implied by the slot.\n"
             " • ablate_position: input latent copied into ALL 9 slots -> no position signal. Question: does the model need to know the input's focus position?\n"
             " • ablate_time: same copy, but position k is passed through SVD's motion_bucket_id number. Question: does the position encoding matter?\n"
             " • zero: input is always frame 0.\n"
-            "Recommendation: random vs ablate_position (cleanest, easiest to explain in 3 minutes); optional third arm ablate_time.\n"
-            "To confirm before spending: svd_pipeline.py handles ablate_position at inference the same way as training.",
-    files=F(put("s7", "conditioning_modes.py", text=lines(runner, 462, 547)))))
+            "DECISION (user approved): three arms A=random (paper default), B=ablate_position, C=ablate_time. 'zero' dropped: it only ever sees the nearest-focus input, so testing at other positions is not a fair comparison.\n"
+            "VERIFIED: svd_pipeline.py (inference) treats ablate_position / ablate_time exactly as training does (input latent repeated into all 9 slots; for ablate_time the position goes through motion_bucket_id).\n"
+            "Questions: A vs B = does knowing the input's focus position help? A vs C = does HOW the position is encoded matter?",
+    files=F(put("s7", "conditioning_modes.py", text=lines(runner, 462, 547)), put("s7", "svd_pipeline_conditioning_inference.py", text=lines(CODE + "training/svd_pipeline.py", 557, 590)))))
 
 # 8 ---------------------------------------------------------------------------------------------------------
-STEPS.append(dict(title="Fine-tune runs on Lambda", state="todo", note="identical data/steps/seed per arm",
-    details="Not started. Plan: each arm fine-tunes the same SVD base from scratch (only temporal transformer blocks), same seed, same step count, bf16 + checkpointing, no in-run validation.\n"
-            "Budget math from the benchmark: 1.71 s/step -> 10,000 steps = ~4.75 h = ~$9.5 per arm. 20,000 steps = ~$19 per arm. (Authors: 200,000 steps.)\n"
-            "Loss/checkpoints will stream to this dashboard."))
+STEPS.append(dict(title="Fine-tune the 3 arms on 8x A100 (parallel) + evaluate", state="doing", note="instance setup in progress; training starts when ready",
+    details="Budget changed by the user to up to $20/hr for ~3 hours. Instance: 8x A100 40GB (gpu_8x_a100, us-east-1) at $15.92/hr = $1.99 per GPU-hour, the same rate as one GPU: parallelism buys SPEED, not cheaper compute. Hard cap $65 enforced by a local watchdog.\n"
+            "LAYOUT: GPUs 0-1 arm A (random) | 2-3 arm B (ablate_position) | 4-5 arm C (ablate_time) | 6 authors' checkpoint evaluation | 7 spare (Blender macro scene). Each arm trains with 2-GPU data parallelism, then is evaluated on its own GPU.\n"
+            "TRAINING (identical for all arms except `conditioning`): SVD base, only temporal transformer blocks trained, seed 0, bf16 + gradient checkpointing, per-GPU batch 1 (global 2), lr 1e-5 x scale_lr 2 = 2e-5, AdamW, 4,000 steps = 8,000 samples (~5.4 passes over the 1,474 train scenes), checkpoints every 1,000 steps.\n"
+            "DEVIATIONS from the authors (to state in the report): bf16 + checkpointing (fp32 OOMs on 40GB), 4,000 vs 200,000 steps (2%), no EMA, their hardware/batch is not stated, in-training validation disabled (crashes under bf16).\n"
+            "EVALUATION (fixed subset): 20 test scenes x input positions {1,4,7} = 60 generations per model; metrics on the 8 non-input frames: PSNR, SSIM, LPIPS(vgg) + depth-consistency score (Spearman of sharpest-frame index vs monocular disparity). FID/VIF not reported (too few images).\n"
+            "Pipeline smoke test (authors' checkpoint, 2 scenes x 3 positions): PSNR 32.7, SSIM 0.934, LPIPS 0.195, depth-rho -0.21 (real stacks -0.52). Pipeline works; numbers are from only 6 generations.\n"
+            "Loss curves per run stream into the chart above; per-GPU metadata is in 'GPU details'.",
+    files=F(put("s8", "run_ablation_8x.sh", R + "scripts/run_ablation_8x.sh"), put("s8", "eval_metrics.py", R + "scripts/eval_metrics.py"), put("s8", "remote_patch.py", R + "scripts/remote_patch.py"),
+            put("s8", "setup_new_instance.sh", R + "scripts/setup_new_instance.sh"))))
 
 # 9 ---------------------------------------------------------------------------------------------------------
 STEPS.append(dict(title="Blender demo scenes (CC0 assets) -> model", state="doing", note="renders done · inference running",
@@ -132,13 +139,20 @@ STEPS.append(dict(title="Blender demo scenes (CC0 assets) -> model", state="doin
             " f/1.4: correlation GT-vs-model duck 0.00, bust -0.14, cat 0.20. f/4: duck 0.32, bust 0.46, cat 0.81.\n"
             " The model DOES sweep focus near-to-far in the right order (duck sharpest ~pos 3, bust ~pos 5, cat rising at 6-8), but its peaks arrive ~1-2 positions later than Blender's, are weaker for far objects, and it keeps the near duck sharp one position too long.\n"
             " Weaker blur (f/4) agrees much better than f/1.4 (supports, does not prove, 'our blur is far stronger than phone photos'). f/8 is uninformative: even the ground truth barely changes across positions.\n"
-            "Likely remaining cause (NOT verified): our guessed mapping from position to focus distance. The README says positions 0..8 span 5 cm to infinity (iPhone lens position 0..0.8): if spacing is linear in diopters (assumption), positions 0..7 cover only ~5-40 cm, i.e. the dataset is macro-scale, while our scene spans 0.45-200 m. Next test: re-render a macro-scale scene (objects 0.1-0.6 m) with that mapping.",
+            "Likely remaining cause (NOT verified): our guessed mapping from position to focus distance. The README says positions 0..8 span 5 cm to infinity (iPhone lens position 0..0.8): if spacing is linear in diopters (assumption), positions 0..7 cover only ~5-40 cm, i.e. the dataset is macro-scale, while our scene spans 0.45-200 m. Next test: re-render a macro-scale scene (objects 0.1-0.6 m) with that mapping.\n\n"
+            "RESULT 3 (macro scene, phone-like camera 7mm sensor / 6mm lens / f/1.8, objects at 0.10/0.133/0.20/0.40 m, assumed diopter-linear position scale so GT peaks at positions 4/5/6/7; duck ROI discarded - dominated by background texture): NOT a clean fix.\n"
+            " Input pos 4: model peaks 1 position LATE for apple (6 vs 5), bust (7 vs 6), cat (8 vs 7); correct near-to-far order, qualitatively plausible (compare_macro_in4.jpg).\n"
+            " Input pos 6: model peaks EARLY (apple 3 vs 5, bust 5 vs 6, cat 4 vs 7) and out of depth order.\n"
+            " So the offset changes sign with the input position: it is not a fixed calibration error. We cannot separate a wrong distance-to-position assumption from the synthetic-vs-real domain shift without real photos at known distances. Single scene, single input each, indicative only.",
     files=F(put("s9", "ground_truth_still_life.jpg", SCR + "gt_still.jpg"), put("s9", "ground_truth_garden.jpg", SCR + "gt_garden.jpg"),
             put("s9", "make_scene.py", R + "blender/make_scene.py"), put("s9", "fetch_polyhaven.py", R + "scripts/fetch_polyhaven.py"))))
 for extra in ("compare_still_life_in2.jpg", "compare_still_life_in6.jpg", "compare_garden_in2.jpg", "compare_garden_in5.jpg",
               "compare_still_f4_in2.jpg", "compare_still_f4_in6.jpg", "compare_still_f8_in2.jpg", "compare_still_f8_in6.jpg"):
     f = put("s9", extra, SCR + extra)
     if f: STEPS[-1]["files"].append(f)
+for src, name in ((SCR + "macro_curves.png", "macro_peak_curves.png"), (SCR + "compare_macro_in4.jpg", "macro_compare_in4.jpg"), (SCR + "compare_macro_in6.jpg", "macro_compare_in6.jpg")):
+    f = put("s9", name, src)
+    if f: STEPS[-1]["files"].insert(0, f)
 for src, name in ((SCR + "sharp_curves.png", "sharpness_curves.png"),):
     f = put("s9", name, src)
     if f: STEPS[-1]["files"].insert(0, f)

@@ -17,6 +17,11 @@ details.step{display:block;padding:0;border-bottom:1px solid #232734}details.ste
 details.step>summary::-webkit-details-marker{display:none}details.step>summary::after{content:'▸';margin-left:auto;color:var(--mut)}details.step[open]>summary::after{content:'▾'}
 .body{padding:2px 0 14px 20px}.det{font-size:14px;color:#c9cfdd;line-height:1.55;margin-bottom:10px}
 .file{margin:10px 0}.file img{max-width:100%;border-radius:8px;display:block}.file iframe{width:100%;height:520px;border:0;border-radius:8px;background:#fff}
+details.gpu{border-bottom:1px solid #232734;padding:0}details.gpu>summary{cursor:pointer;padding:9px 0;list-style:none;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+details.gpu>summary::-webkit-details-marker{display:none}details.gpu>summary::before{content:'▸';color:var(--mut)}details.gpu[open]>summary::before{content:'▾'}
+.gs{font-variant-numeric:tabular-nums;font-weight:600}.gb{padding:2px 0 14px 18px}.gchart{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin-bottom:10px}
+.gchart canvas{width:100%;height:90px;background:#10131a;border-radius:6px}.kvt{width:100%;border-collapse:collapse;font-size:13px}.kvt td{padding:3px 8px 3px 0;vertical-align:top;border-bottom:1px solid #1f2330}
+.kvt td:first-child{color:var(--mut);width:42%}details.gpu>pre{margin:0 0 10px 18px}
 .fcap{font-size:12px;color:var(--mut);margin-bottom:4px}details.ftext{background:#10131a;border-radius:8px;padding:6px 10px}details.ftext>summary{cursor:pointer;font-size:13px;color:var(--acc)}
 canvas{width:100%;height:220px;background:#10131a;border-radius:8px}
 pre{margin:0;max-height:260px;overflow:auto;font:12px/1.4 ui-monospace,Consolas,monospace;color:#b8c0d4;white-space:pre-wrap}
@@ -30,6 +35,7 @@ a{color:var(--acc)}.kv{display:flex;gap:18px;flex-wrap:wrap}.kv div b{display:bl
 <div class="card"><h2>Now</h2><div class="kv" id="kv"></div></div>
 <div class="card"><h2>Plan / progress</h2><div id="steps"></div></div>
 <div class="card"><h2>Lambda cloud</h2><div class="kv" id="cloudk"></div><div class="sub" id="cloudn" style="margin-top:8px"></div><pre id="cloudj" style="max-height:90px;margin-top:6px"></pre></div>
+<div class="card"><h2>GPU details <span class="sub" id="gpun" style="text-transform:none;letter-spacing:0"></span></h2><div id="gpus"></div><div id="gextra"></div></div>
 <div class="card"><h2>This PC (temperatures)</h2><div class="kv" id="sysk"></div><canvas id="cv2" width="900" height="160" style="height:140px;margin-top:10px"></canvas><div class="sub" id="sysnote"></div></div>
 <div class="card"><h2>Training loss</h2><canvas id="cv" width="900" height="220"></canvas><div class="sub" id="cvlab"></div></div>
 <div class="card"><h2>Latest samples</h2><div class="grid" id="imgs"></div></div>
@@ -48,6 +54,20 @@ function chart(rows){
   x.strokeStyle='#6aa7ff';x.lineWidth=2;x.beginPath();
   pts.forEach((r,i)=>{const px=30+(r.step-x0)/(x1-x0||1)*(c.width-40),py=c.height-20-(r.loss-y0)/(y1-y0||1)*(c.height-40);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();
   x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText(y1.toFixed(3),2,16);x.fillText(y0.toFixed(3),2,c.height-22);x.fillText('step '+x0+' → '+x1,c.width-120,c.height-4);
+}
+const RUNCOL=['#6aa7ff','#e5a93d','#4cc38a','#ef6b6b','#b48cff','#7fd1d1'];
+function chart2(rows){
+  const c=document.getElementById('cv'),x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);
+  const pts=rows.filter(r=>r.loss!=null&&r.run);const runs=[...new Set(pts.map(r=>r.run))];
+  const lab=document.getElementById('cvlab');
+  if(pts.length<2){lab.textContent='no training metrics yet';return}
+  // smooth with a moving average (window 15) so curves are readable
+  const by={};runs.forEach(r=>{const a=pts.filter(p=>p.run===r).sort((u,v)=>u.step-v.step);by[r]=a.map((p,i)=>{const w=a.slice(Math.max(0,i-14),i+1);return {step:p.step,loss:w.reduce((s,q)=>s+q.loss,0)/w.length}})});
+  const all=Object.values(by).flat();const x0=Math.min(...all.map(p=>p.step)),x1=Math.max(...all.map(p=>p.step));
+  const ys=all.map(p=>p.loss).sort((a,b)=>a-b);const y0=ys[Math.floor(ys.length*0.02)],y1=ys[Math.floor(ys.length*0.98)];
+  runs.forEach((r,k)=>{x.strokeStyle=RUNCOL[k%RUNCOL.length];x.lineWidth=2;x.beginPath();by[r].forEach((p,i)=>{const px=40+(p.step-x0)/(x1-x0||1)*(c.width-50),py=c.height-22-(Math.min(Math.max(p.loss,y0),y1)-y0)/(y1-y0||1)*(c.height-44);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()});
+  x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText(y1.toFixed(3),2,16);x.fillText(y0.toFixed(3),2,c.height-24);x.fillText('step '+x0+' → '+x1,c.width-130,c.height-4);
+  lab.innerHTML=runs.map((r,k)=>{const l=by[r][by[r].length-1];return `<span style="color:${RUNCOL[k%RUNCOL.length]}">● ${r}</span> step ${l.step} · loss ${l.loss.toFixed(4)}`}).join(' &nbsp; ')+' <span class="sub">(15-point moving average)</span>';
 }
 function line(c,series,colors,unit){
   const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);
@@ -81,6 +101,48 @@ function renderSteps(steps){
   document.querySelectorAll('#steps > details.step').forEach(d=>d.addEventListener('toggle',()=>{d.open?openSteps.add(d.dataset.k):openSteps.delete(d.dataset.k);localStorage.setItem('openSteps',JSON.stringify([...openSteps]))}));
   document.querySelectorAll('details.ftext').forEach(d=>d.addEventListener('toggle',async()=>{if(d.open&&!d.dataset.done){d.dataset.done=1;try{const r=await fetch(d.dataset.u);let t=await r.text();if(t.length>60000)t=t.slice(0,60000)+'\n… (truncated)';d.querySelector('pre').textContent=t}catch(e){d.querySelector('pre').textContent='failed: '+e}}}));
 }
+function spark(cv,ys,col,label,fmt){
+  const x=cv.getContext('2d'),w=cv.width,h=cv.height;x.clearRect(0,0,w,h);
+  const v=ys.filter(a=>a!=null);if(v.length<2){x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText(label+': collecting…',6,16);return}
+  const lo=Math.min(...v,0),hi=Math.max(...v)*1.1||1;x.strokeStyle=col;x.lineWidth=2;x.beginPath();
+  ys.forEach((a,i)=>{if(a==null)return;const px=4+i/(ys.length-1)*(w-8),py=h-14-(a-lo)/(hi-lo||1)*(h-28);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();
+  x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText(label+' · now '+fmt(v[v.length-1])+' · peak '+fmt(Math.max(...v)),6,12);
+}
+const openG=new Set(JSON.parse(localStorage.getItem('openG')||'[]'));
+function kv(rows){return '<table class="kvt">'+rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')+'</table>'}
+function gpuBody(g,c){
+  const n=v=>(v==null||v==='[N/A]'||v==='')?'n/a':v;const i=g.index;
+  const rows=[['Name',g.name],['UUID',g.uuid],['PCI bus',g['pci.bus_id']],['Serial',n(g.serial)],['Driver',g.driver_version],['VBIOS',g.vbios_version],
+   ['Performance state',g.pstate],['Persistence mode',g.persistence_mode],['Compute mode',g.compute_mode],['MIG mode',n(g['mig.mode.current'])],['Fan',n(g['fan.speed'])],
+   ['Temperature (GPU / memory)',n(g['temperature.gpu'])+' / '+n(g['temperature.memory'])+' °C'],['Utilisation (compute / memory-bus)',n(g['utilization.gpu'])+' % / '+n(g['utilization.memory'])+' %'],
+   ['Memory used / free / total',n(g['memory.used'])+' / '+n(g['memory.free'])+' / '+n(g['memory.total'])+' MiB'],
+   ['Power draw / limit / enforced / max',n(g['power.draw'])+' / '+n(g['power.limit'])+' / '+n(g['enforced.power.limit'])+' / '+n(g['power.max_limit'])+' W'],
+   ['SM clock (now / max)',n(g['clocks.sm'])+' / '+n(g['clocks.max.sm'])+' MHz'],['Memory clock (now / max)',n(g['clocks.mem'])+' / '+n(g['clocks.max.mem'])+' MHz'],
+   ['PCIe link (gen now / max, width now / max)',n(g['pcie.link.gen.current'])+' / '+n(g['pcie.link.gen.max'])+', x'+n(g['pcie.link.width.current'])+' / x'+n(g['pcie.link.width.max'])],
+   ['ECC mode',n(g['ecc.mode.current'])],['ECC errors (corrected / uncorrected, since driver load)',n(g['ecc.errors.corrected.volatile.total'])+' / '+n(g['ecc.errors.uncorrected.volatile.total'])],
+   ['Clock throttle reasons',(g.throttle||[]).join(', ')]];
+  const pr=(c.procs||[]).filter(p=>p.uuid===g.uuid);
+  const ph=pr.length?'<table class="kvt">'+pr.map(p=>`<tr><td>pid ${esc(p.pid)}</td><td>${esc(p.name)} · ${esc(p.mem)} MiB</td></tr>`).join('')+'</table>':'<div class="sub">no compute processes on this GPU</div>';
+  return `<div class="gchart"><canvas data-k="u" width="420" height="90"></canvas><canvas data-k="m" width="420" height="90"></canvas><canvas data-k="t" width="420" height="90"></canvas><canvas data-k="p" width="420" height="90"></canvas></div>`+kv(rows)+'<div class="sub" style="margin:8px 0 2px">Processes on this GPU</div>'+ph;
+}
+function drawG(d,g,c){
+  const h=(c.hist||{})[g.index]||[];const cols={u:['#6aa7ff','GPU util %',v=>v.toFixed(0)+'%',1],m:['#e5a93d','Memory GiB',v=>v.toFixed(1)+' GiB',2],t:['#ef6b6b','Temp °C',v=>v.toFixed(0)+'°C',3],p:['#4cc38a','Power W',v=>v.toFixed(0)+' W',4]};
+  d.querySelectorAll('canvas').forEach(cv=>{const s=cols[cv.dataset.k];spark(cv,h.map(r=>cv.dataset.k==='m'&&r[s[3]]!=null?r[s[3]]/1024:r[s[3]]),s[0],s[1],s[2])});
+}
+function gpuPanel(c){
+  const box=document.getElementById('gpus'),ex=document.getElementById('gextra');
+  if(!c||!c.gpus||!c.gpus.length){box.innerHTML='<span class="sub">no per-GPU data yet</span>';return}
+  document.getElementById('gpun').textContent='· '+c.gpus.length+' GPU(s)';
+  c.gpus.forEach(g=>{let d=box.querySelector(`details[data-g="${g.index}"]`);
+    if(!d){d=document.createElement('details');d.className='gpu';d.dataset.g=g.index;if(openG.has(g.index))d.open=true;d.innerHTML='<summary></summary><div class="gb"></div>';
+      d.addEventListener('toggle',()=>{d.open?openG.add(g.index):openG.delete(g.index);localStorage.setItem('openG',JSON.stringify([...openG]))});box.appendChild(d)}
+    const u=+g['utilization.gpu']||0,mu=(+g['memory.used']||0)/1024,mt=(+g['memory.total']||0)/1024,col=u>80?'#4cc38a':u>5?'#e5a93d':'#8b91a1';
+    d.querySelector('summary').innerHTML=`<b>GPU ${g.index}</b> <span class="sub">${esc(g.name)}</span> <span class="gs" style="color:${col}">${u.toFixed(0)}%</span> <span class="gs">${mu.toFixed(1)}/${mt.toFixed(0)} GB</span> <span class="gs">${g['temperature.gpu']}°C</span> <span class="gs">${g['power.draw']==='[N/A]'?'':(+g['power.draw']).toFixed(0)+' W'}</span>`;
+    if(d.open){d.querySelector('.gb').innerHTML=gpuBody(g,c);drawG(d,g,c)}});
+  const sec=(id,title,body)=>{let d=ex.querySelector(`details[data-x="${id}"]`);if(!d){d=document.createElement('details');d.className='gpu';d.dataset.x=id;d.innerHTML=`<summary><b>${title}</b></summary><pre></pre>`;ex.appendChild(d)}
+    if(d.open||!d.dataset.f){d.querySelector('pre').textContent=body;d.dataset.f=1}};
+  sec('host','Host: load, RAM, disk',c.host||'n/a');sec('topo','GPU interconnect topology (NVLink = NV#, PHB = PCIe host bridge)',c.topo||'n/a');sec('runs','Latest line of each training / evaluation log',c.runs||'n/a');
+}
 function hm(s){s=Math.max(0,Math.round(s));return Math.floor(s/3600)+'h '+String(Math.floor(s%3600/60)).padStart(2,'0')+'m'}
 function cloudPanel(c){
   const k=document.getElementById('cloudk'),n=document.getElementById('cloudn'),j=document.getElementById('cloudj');
@@ -99,7 +161,7 @@ async function tick(){
     document.getElementById('upd').textContent='updated '+new Date().toLocaleTimeString();
     document.getElementById('kv').innerHTML=(st.kv||[]).map(k=>`<div><span class="sub">${k[0]}</span><b>${k[1]}</b></div>`).join('')||'<span class="sub">—</span>';
     renderSteps(st.steps||[]);
-    chart(s.metrics);sysPanel(s.sys||[]);cloudPanel(s.cloud);
+    chart2(s.metrics);sysPanel(s.sys||[]);cloudPanel(s.cloud);gpuPanel(s.cloud);
     document.getElementById('imgs').innerHTML=s.images.map(n=>`<a href="${q('/files/samples/'+n)}" target=_blank><img loading=lazy src="${q('/files/samples/'+n)}"></a>`).join('');
     if(s.files.length)document.getElementById('files').innerHTML=s.files.map(f=>`<a href="${q('/files/'+f)}" target=_blank>${f}</a>`).join(' · ');
     const L=document.getElementById('log');const stick=L.scrollTop+L.clientHeight>=L.scrollHeight-20;
