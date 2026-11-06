@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Refocus project</title>
+<style>
+:root{--bg:#0f1115;--card:#181b22;--fg:#e6e8ee;--mut:#8b91a1;--ok:#4cc38a;--run:#e5a93d;--todo:#5b6275;--acc:#6aa7ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,Segoe UI,sans-serif;padding:16px;max-width:1000px;margin:auto}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 10px}
+.card{background:var(--card);border-radius:12px;padding:14px;margin:12px 0}
+.sub{color:var(--mut);font-size:13px}
+.step{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #232734}.step:last-child{border:0}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:7px;flex:none;background:var(--todo)}
+.done .dot{background:var(--ok)}.doing .dot{background:var(--run);animation:p 1.2s infinite}
+@keyframes p{50%{opacity:.3}}
+.step small{color:var(--mut);display:block}
+canvas{width:100%;height:220px;background:#10131a;border-radius:8px}
+pre{margin:0;max-height:260px;overflow:auto;font:12px/1.4 ui-monospace,Consolas,monospace;color:#b8c0d4;white-space:pre-wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.grid img{width:100%;border-radius:6px}
+a{color:var(--acc)}.kv{display:flex;gap:18px;flex-wrap:wrap}.kv div b{display:block;font-size:20px}
+</style></head><body>
+<h1>Learning to Refocus — project monitor</h1>
+<div class="sub" id="upd">loading…</div>
+
+<div class="card"><h2>Now</h2><div class="kv" id="kv"></div></div>
+<div class="card"><h2>Plan / progress</h2><div id="steps"></div></div>
+<div class="card"><h2>Training loss</h2><canvas id="cv" width="900" height="220"></canvas><div class="sub" id="cvlab"></div></div>
+<div class="card"><h2>Latest samples</h2><div class="grid" id="imgs"></div></div>
+<div class="card"><h2>Downloads</h2><div id="files" class="sub">none yet</div></div>
+<div class="card"><h2>Log</h2><pre id="log"></pre></div>
+
+<script>
+const key=new URLSearchParams(location.search).get('key')||'';
+const q=p=>p+(p.includes('?')?'&':'?')+'key='+encodeURIComponent(key);
+function chart(rows){
+  const c=document.getElementById('cv'),x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);
+  const pts=rows.filter(r=>r.loss!=null);document.getElementById('cvlab').textContent=pts.length?('run '+pts[pts.length-1].run+' · step '+pts[pts.length-1].step+' · loss '+(+pts[pts.length-1].loss).toFixed(4)):'no training metrics yet';
+  if(pts.length<2)return;
+  const xs=pts.map(r=>r.step),ys=pts.map(r=>r.loss);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  x.strokeStyle='#6aa7ff';x.lineWidth=2;x.beginPath();
+  pts.forEach((r,i)=>{const px=30+(r.step-x0)/(x1-x0||1)*(c.width-40),py=c.height-20-(r.loss-y0)/(y1-y0||1)*(c.height-40);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();
+  x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText(y1.toFixed(3),2,16);x.fillText(y0.toFixed(3),2,c.height-22);x.fillText('step '+x0+' → '+x1,c.width-120,c.height-4);
+}
+async function tick(){
+  try{
+    const r=await fetch(q('/api/state'));if(!r.ok){document.getElementById('upd').textContent='bad key';return}
+    const s=await r.json(),st=s.status||{};
+    document.getElementById('upd').textContent='updated '+new Date().toLocaleTimeString();
+    document.getElementById('kv').innerHTML=(st.kv||[]).map(k=>`<div><span class="sub">${k[0]}</span><b>${k[1]}</b></div>`).join('')||'<span class="sub">—</span>';
+    document.getElementById('steps').innerHTML=(st.steps||[]).map(t=>`<div class="step ${t.state}"><span class="dot"></span><div>${t.title}<small>${t.note||''}</small></div></div>`).join('');
+    chart(s.metrics);
+    document.getElementById('imgs').innerHTML=s.images.map(n=>`<a href="${q('/files/samples/'+n)}" target=_blank><img loading=lazy src="${q('/files/samples/'+n)}"></a>`).join('');
+    if(s.files.length)document.getElementById('files').innerHTML=s.files.map(f=>`<a href="${q('/files/'+f)}" target=_blank>${f}</a>`).join(' · ');
+    const L=document.getElementById('log');const stick=L.scrollTop+L.clientHeight>=L.scrollHeight-20;
+    L.textContent=s.logs.map(l=>new Date(l.t*1000).toLocaleTimeString()+' '+(l.run?'['+l.run+'] ':'')+l.line).join('\n');if(stick)L.scrollTop=L.scrollHeight;
+  }catch(e){document.getElementById('upd').textContent='offline: '+e}
+}
+tick();setInterval(tick,5000);
+</script></body></html>

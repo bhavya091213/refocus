@@ -1,0 +1,28 @@
+# third-party / large / local-only
+code/
+data/
+runs/
+tools/
+logs/
+slides/*.pptx
+*.pt
+*.safetensors
+*.ckpt
+*.zip
+
+# dashboard secrets and runtime state
+dashboard/token.txt
+dashboard/status.json
+dashboard/metrics.jsonl
+dashboard/log.jsonl
+dashboard/public/
+
+# LaTeX build output
+report/*.pdf
+report/*.aux
+report/*.log
+report/*.out
+report/*.xdv
+report/*.fls
+
+__pycache__/

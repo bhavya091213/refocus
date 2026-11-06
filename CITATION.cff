@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "This project reproduces and ablates the work below. Please cite the original paper."
+title: "refocus (course project reproducing Learning to Refocus with Video Diffusion Models)"
+repository-code: "https://github.com/bhavya091213/refocus"
+references:
+  - type: conference-paper
+    title: "Learning to Refocus with Video Diffusion Models"
+    authors:
+      - family-names: Tedla
+        given-names: SaiKiran
+      - family-names: Zhang
+        given-names: Zhoutong
+      - family-names: Zhang
+        given-names: Xuaner
+      - family-names: Xin
+        given-names: Shumian
+    collection-title: "Proceedings of the ACM SIGGRAPH Asia Conference"
+    year: 2025
+    url: "https://learn2refocus.github.io/"
+    doi: "10.1145/3757377.3763873"
