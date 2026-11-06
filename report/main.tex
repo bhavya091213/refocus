@@ -160,6 +160,18 @@ Given the generated stack, define a local sharpness for frame $j$ at pixel $p$, 
 $s_j(p)=\mathrm{Var}_{q\in W_p}[\nabla^2 \hat I_j(q)]$. Clicking $p$ displays $\hat I_{j^\star}$ with $j^\star=\arg\max_j s_j(p)$.
 \todo{implement, show screenshots, discuss failure on textureless regions}
 
+
+\section{Extra credit: depth and focus (exploration)}\label{sec:depth}
+\textbf{Idea.} In a focal stack, the frame that is sharpest at a pixel is a proxy for that pixel's depth (depth from focus). If so, a monocular depth estimator should \emph{agree} with the focal stack, and depth could be used to evaluate, calibrate, or condition a refocusing model.
+
+\textbf{Experiment (real data, no training).} For 16 test scenes (every $\sim$10th scene in \texttt{test\_scenes.pkl}) we computed (i) the per-pixel index of the sharpest frame (absolute Laplacian, $21\times21$ box filter) and (ii) relative disparity from Depth Anything V2 Small~\cite{yang2024depthanythingv2} on the middle frame (position 4). Using the 40\% most textured pixels with a clear sharpness peak, we measured the Spearman rank correlation between the two.
+\begin{figure}[h]\centering\includegraphics[width=\linewidth]{depth_vs_focus.png}
+\caption{Left: per-scene Spearman correlation between the sharpest-frame index and monocular disparity (mean $-0.80$; all 16 scenes negative, range $-0.97$ to $-0.35$). Right: median normalised disparity (1 = near) of pixels that are sharpest at each focus position; light lines are single scenes.}\end{figure}
+\textbf{Result.} Near pixels are sharpest at low positions and far pixels at high positions, as expected (mean $\rho=-0.80$). The mean curve is roughly flat over positions 0--2 and then falls steadily to position 8.
+\textbf{Caveats.} One depth model, 16 scenes, a hand-chosen texture mask, relative (not metric) depth, and only ``which depth is sharp'' not absolute distance. It is an exploration, not a benchmark.
+
+\textbf{Opportunities we considered} (ordered by effort/benefit): (A) a label-free \emph{depth-consistency score} for generated stacks, i.e.\ the same correlation computed on the model's output; (B) a classical baseline (monocular depth + synthetic lens blur) to show what a generative model adds, namely sharpening and not only blurring; (C) depth as an extra conditioning input or an auxiliary loss, which is the riskiest because it changes the network input; (D) NYU Depth V2~\cite{silberman2012nyu} (1{,}449 labelled RGB-D pairs, 2.8\,GB) to validate the depth estimator or to simulate focal stacks, with the caveats of Kinect depth holes, low resolution and no stated licence; (E) using the measured position--depth relationship to place objects in the Blender demo so it matches the phone's scale.
+
 \section{Limitations and discussion}
 \tbd
 
@@ -171,5 +183,7 @@ $s_j(p)=\mathrm{Var}_{q\in W_p}[\nabla^2 \hat I_j(q)]$. Clicking $p$ displays $\
   \url{https://learn2refocus.github.io/}; code: \url{https://github.com/tedlasai/learn2refocus}.
 \bibitem{blattmann2023svd} A.~Blattmann et al. \emph{Stable Video Diffusion: Scaling Latent Video Diffusion Models to Large Datasets}. arXiv:2311.15127, 2023.
 \bibitem{karras2022edm} T.~Karras, M.~Aittala, T.~Aila, S.~Laine. \emph{Elucidating the Design Space of Diffusion-Based Generative Models}. NeurIPS, 2022.
+\bibitem{yang2024depthanythingv2} L.~Yang et al. \emph{Depth Anything V2}. NeurIPS, 2024. arXiv:2406.09414.
+\bibitem{silberman2012nyu} N.~Silberman, D.~Hoiem, P.~Kohli, R.~Fergus. \emph{Indoor Segmentation and Support Inference from RGBD Images}. ECCV, 2012. \url{https://cs.nyu.edu/~fergus/datasets/nyu_depth_v2.html}.
 \end{thebibliography}
 \end{document}
