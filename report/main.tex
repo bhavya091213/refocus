@@ -21,7 +21,7 @@ We follow Tedla et al.~\cite{tedla2025refocus}, who treat a focal stack as a vid
 Stable Video Diffusion~\cite{blattmann2023svd} on a smartphone focal-stack dataset.
 We (i) reproduce their pipeline and evaluate their released checkpoint, (ii) fine-tune the same
 model ourselves under a small compute budget, and (iii) run a controlled ablation on how the input image and its focus position are presented to the network.
-\tbd{one-sentence headline result}.
+Headline result pending: the authors' checkpoint scores PSNR 31.07, SSIM 0.893, LPIPS 0.160 on our test subset; the three ablation arms are being evaluated.
 \end{abstract}
 
 \section{Problem statement}
@@ -156,21 +156,21 @@ We read the inference code (\texttt{svd\_pipeline.py}) to confirm that inference
 \textbf{Deviations from the authors' training} (stated so the comparison is honest): bf16 and gradient checkpointing (fp32 without checkpointing ran out of memory on a 40\,GB GPU in our test); 4{,}000 steps versus their 200{,}000 (2\%); their hardware and batch size are not stated in the repository; no EMA; their in-training validation was disabled (it crashes under bf16) and we evaluate separately.
 
 \begin{table}[h]\centering
-\caption{Test-subset results (20 scenes $\times$ input positions 1, 4, 7; 8 non-input frames each; mean $\pm$ s.e.). \tbd}\label{tab:results}
+\caption{Test-subset results (20 scenes $\times$ input positions 1, 4, 7; 8 non-input frames each; mean $\pm$ s.e.). Rows A--C: all three arms finished training (4{,}000 steps); their held-out evaluation was still running when this version was compiled.}\label{tab:results}
 \begin{tabular}{lcccc}\toprule
 Model & PSNR$\uparrow$ & SSIM$\uparrow$ & LPIPS$\downarrow$ & depth-$\rho$ ($\downarrow$)\\\midrule
-Authors' 200k checkpoint & \tbd & \tbd & \tbd & \tbd\\
-A: \texttt{random} (ours, 4k steps) & \tbd & \tbd & \tbd & \tbd\\
-B: \texttt{ablate\_position} (ours) & \tbd & \tbd & \tbd & \tbd\\
-C: \texttt{ablate\_time} (ours) & \tbd & \tbd & \tbd & \tbd\\
-Real stacks (reference) & -- & -- & -- & \tbd\\
+Authors' 200k checkpoint & $31.07\pm0.14$ & $0.893\pm0.003$ & $0.160\pm0.002$ & $-0.70$\\
+A: \texttt{random} (ours, 4k steps) & \multicolumn{4}{c}{\emph{evaluation running}}\\
+B: \texttt{ablate\_position} (ours) & \multicolumn{4}{c}{\emph{evaluation running}}\\
+C: \texttt{ablate\_time} (ours) & \multicolumn{4}{c}{\emph{evaluation running}}\\
+Real stacks (reference) & -- & -- & -- & $-0.76$\\
 \bottomrule\end{tabular}\end{table}
 
 \subsection{Pipeline check}
 Before training we ran the full evaluation on the authors' checkpoint with 2 scenes $\times$ 3 positions (6 generations) as a smoke test: PSNR 32.7, SSIM 0.934, LPIPS 0.195, depth-consistency $-0.21$ (real stacks of those 2 scenes: $-0.52$). With so few scenes these numbers only show that the pipeline works.
 
 \subsection{Compute budget}
-Training and evaluation run on one 8$\times$A100-40\,GB cloud instance at \$15.92/h (\$1.99 per GPU-hour, the same rate as a single GPU, so parallelism buys speed, not cheaper compute). Earlier single-GPU benchmarking measured 1.71\,s per step with bf16 and checkpointing and a 37.8\,GB peak. \tbd{total hours and dollars spent, against the \$100 cap}
+Training and evaluation run on one 8$\times$A100-40\,GB cloud instance at \$15.92/h (\$1.99 per GPU-hour, the same rate as a single GPU, so parallelism buys speed, not cheaper compute). Earlier single-GPU benchmarking measured 1.71\,s per step with bf16 and checkpointing and a 37.8\,GB peak. Status at compile time: each arm trained 4{,}000 steps in about 1\,h\,58\,min (1.77\,s/step); the authors' checkpoint evaluation took 72\,min. Final hours and dollars will be added when the three arm evaluations finish, against the \$100 cap.
 
 \section{Synthetic demo: refocusing Blender scenes with known optics}\label{sec:blender}
 \textbf{Motivation.} The real dataset has no ground-truth optics. For a demo we built depth-layered scenes in Blender 4.5 (Cycles, thin-lens depth of field, 640$\times$896, 48 samples with denoising) from public-domain (CC0) Poly Haven\footnote{\url{https://polyhaven.com}} models (rubber duck, apple, marble bust, potted plant, concrete cat statue, rocks, tree) and HDRI lighting (\texttt{studio\_small\_09}, \texttt{kloofendal\_48d\_partly\_cloudy\_puresky}). For each scene we render a true 9-frame focal stack by moving the camera's focus distance, give \emph{one} frame to the authors' released model, and compare its generated stack with the rendered one. We measure local sharpness (variance of the Laplacian) in a box around each object for every frame. \textbf{Important limitations:} the mapping from the phone's lens positions 0--8 to focus distances is not given, so every mapping below is our assumption; the renders are synthetic, so a domain shift from smartphone photos is unavoidable; and each result is one scene, one input frame, one sample.
@@ -217,10 +217,10 @@ $s_j(p)=\mathrm{Var}_{q\in W_p}[\nabla^2 \hat I_j(q)]$. Clicking $p$ displays $\
 \textbf{Opportunities we considered} (ordered by effort/benefit): (A) a label-free \emph{depth-consistency score} for generated stacks, i.e.\ the same correlation computed on the model's output; (B) a classical baseline (monocular depth + synthetic lens blur) to show what a generative model adds, namely sharpening and not only blurring; (C) depth as an extra conditioning input or an auxiliary loss, which is the riskiest because it changes the network input; (D) NYU Depth V2~\cite{silberman2012nyu} (1{,}449 labelled RGB-D pairs, 2.8\,GB) to validate the depth estimator or to simulate focal stacks, with the caveats of Kinect depth holes, low resolution and no stated licence; (E) using the measured position--depth relationship to place objects in the Blender demo so it matches the phone's scale.
 
 \section{Limitations and discussion}
-\tbd
+To be written once the arm evaluations finish. Already known: our arms use 2\% of the authors' training steps and a global batch of 2, so they are expected to trail the 200k checkpoint; the ablation compares conditioning schemes under that short budget only; evaluation covers 20 scenes $\times$ 3 input positions.
 
 \section{Conclusion}
-\tbd
+To be completed with the ablation outcome.
 
 \begin{thebibliography}{9}
 \bibitem{tedla2025refocus} S.~Tedla, Z.~Zhang, X.~Zhang, S.~Xin. \emph{Learning to Refocus with Video Diffusion Models}. ACM SIGGRAPH Asia, 2025.
