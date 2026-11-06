@@ -26,6 +26,7 @@ TOKEN = open(TOKEN_FILE).read().strip()
 
 STATUS = os.path.join(ROOT, "status.json")
 METRICS = os.path.join(ROOT, "metrics.jsonl")
+SYS = os.path.join(ROOT, "sys.jsonl")
 LOGS = os.path.join(ROOT, "log.jsonl")
 LOCK = threading.Lock()
 
@@ -88,6 +89,8 @@ class H(BaseHTTPRequestHandler):
                 "status": st,
                 "metrics": metrics_downsampled(),
                 "logs": tail_jsonl(LOGS, 80),
+                "sys": tail_jsonl(SYS, 240),
+                "cloud": (json.load(open(os.path.join(ROOT, "cloud.json"), encoding="utf-8")) if os.path.exists(os.path.join(ROOT, "cloud.json")) else None),
                 "images": sorted(os.listdir(os.path.join(PUBLIC, "samples")))[-24:],
                 "files": [f for f in os.listdir(PUBLIC) if os.path.isfile(os.path.join(PUBLIC, f))],
                 "now": time.time(),
@@ -98,7 +101,9 @@ class H(BaseHTTPRequestHandler):
             if not full.startswith(PUBLIC) or not os.path.isfile(full):
                 return self._send(404, {"error": "nf"})
             ct = {"pdf": "application/pdf", "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
-                  "gif": "image/gif", "mp4": "video/mp4", "txt": "text/plain"}.get(full.rsplit(".", 1)[-1].lower(), "application/octet-stream")
+                  "gif": "image/gif", "mp4": "video/mp4", "txt": "text/plain; charset=utf-8", "log": "text/plain; charset=utf-8",
+                  "yaml": "text/plain; charset=utf-8", "py": "text/plain; charset=utf-8", "tex": "text/plain; charset=utf-8",
+                  "md": "text/plain; charset=utf-8", "json": "text/plain; charset=utf-8", "sh": "text/plain; charset=utf-8"}.get(full.rsplit(".", 1)[-1].lower(), "application/octet-stream")
             return self._send(200, open(full, "rb").read(), ct)
         self._send(404, {"error": "nf"})
 
@@ -112,6 +117,14 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/ingest/metric":
                 d = json.loads(raw); d["t"] = time.time()
                 open(METRICS, "a", encoding="utf-8").write(json.dumps(d) + "\n")
+            elif u.path == "/api/ingest/sys":
+                d = json.loads(raw); d["t"] = time.time()
+                open(SYS, "a", encoding="utf-8").write(json.dumps(d) + "\n")
+                lines = open(SYS, encoding="utf-8").read().splitlines()
+                if len(lines) > 2000: open(SYS, "w", encoding="utf-8").write("\n".join(lines[-1000:]) + "\n")
+            elif u.path == "/api/ingest/cloud":
+                d = json.loads(raw); d["t"] = time.time()
+                open(os.path.join(ROOT, "cloud.json"), "w", encoding="utf-8").write(json.dumps(d))
             elif u.path == "/api/ingest/log":
                 d = json.loads(raw); d["t"] = time.time()
                 open(LOGS, "a", encoding="utf-8").write(json.dumps(d) + "\n")

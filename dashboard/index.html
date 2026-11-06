@@ -13,6 +13,11 @@ h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;text-transform:uppercase;lett
 .done .dot{background:var(--ok)}.doing .dot{background:var(--run);animation:p 1.2s infinite}
 @keyframes p{50%{opacity:.3}}
 .step small{color:var(--mut);display:block}
+details.step{display:block;padding:0;border-bottom:1px solid #232734}details.step>summary{display:flex;gap:10px;padding:8px 0;cursor:pointer;list-style:none}
+details.step>summary::-webkit-details-marker{display:none}details.step>summary::after{content:'▸';margin-left:auto;color:var(--mut)}details.step[open]>summary::after{content:'▾'}
+.body{padding:2px 0 14px 20px}.det{font-size:14px;color:#c9cfdd;line-height:1.55;margin-bottom:10px}
+.file{margin:10px 0}.file img{max-width:100%;border-radius:8px;display:block}.file iframe{width:100%;height:520px;border:0;border-radius:8px;background:#fff}
+.fcap{font-size:12px;color:var(--mut);margin-bottom:4px}details.ftext{background:#10131a;border-radius:8px;padding:6px 10px}details.ftext>summary{cursor:pointer;font-size:13px;color:var(--acc)}
 canvas{width:100%;height:220px;background:#10131a;border-radius:8px}
 pre{margin:0;max-height:260px;overflow:auto;font:12px/1.4 ui-monospace,Consolas,monospace;color:#b8c0d4;white-space:pre-wrap}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -24,6 +29,8 @@ a{color:var(--acc)}.kv{display:flex;gap:18px;flex-wrap:wrap}.kv div b{display:bl
 
 <div class="card"><h2>Now</h2><div class="kv" id="kv"></div></div>
 <div class="card"><h2>Plan / progress</h2><div id="steps"></div></div>
+<div class="card"><h2>Lambda cloud</h2><div class="kv" id="cloudk"></div><div class="sub" id="cloudn" style="margin-top:8px"></div><pre id="cloudj" style="max-height:90px;margin-top:6px"></pre></div>
+<div class="card"><h2>This PC (temperatures)</h2><div class="kv" id="sysk"></div><canvas id="cv2" width="900" height="160" style="height:140px;margin-top:10px"></canvas><div class="sub" id="sysnote"></div></div>
 <div class="card"><h2>Training loss</h2><canvas id="cv" width="900" height="220"></canvas><div class="sub" id="cvlab"></div></div>
 <div class="card"><h2>Latest samples</h2><div class="grid" id="imgs"></div></div>
 <div class="card"><h2>Downloads</h2><div id="files" class="sub">none yet</div></div>
@@ -42,14 +49,57 @@ function chart(rows){
   pts.forEach((r,i)=>{const px=30+(r.step-x0)/(x1-x0||1)*(c.width-40),py=c.height-20-(r.loss-y0)/(y1-y0||1)*(c.height-40);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();
   x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText(y1.toFixed(3),2,16);x.fillText(y0.toFixed(3),2,c.height-22);x.fillText('step '+x0+' → '+x1,c.width-120,c.height-4);
 }
+function line(c,series,colors,unit){
+  const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);
+  const all=series.flat().filter(v=>v!=null);if(all.length<2)return;
+  const lo=Math.min(...all)-2,hi=Math.max(...all)+2;
+  series.forEach((ys,k)=>{x.strokeStyle=colors[k];x.lineWidth=2;x.beginPath();let first=true;
+    ys.forEach((v,i)=>{if(v==null)return;const px=30+i/(ys.length-1||1)*(c.width-40),py=c.height-12-(v-lo)/(hi-lo||1)*(c.height-24);first?(x.moveTo(px,py),first=false):x.lineTo(px,py)});x.stroke()});
+  x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText(hi.toFixed(0)+unit,2,12);x.fillText(lo.toFixed(0)+unit,2,c.height-4);
+}
+function sysPanel(rows){
+  if(!rows.length){document.getElementById('sysk').innerHTML='<span class="sub">no data yet</span>';return}
+  const l=rows[rows.length-1],f=(v,u)=>v==null?'n/a':(+v).toFixed(0)+u;
+  document.getElementById('sysk').innerHTML=[['GPU core',f(l.gpu_core,'°C')],['GPU hot spot',f(l.gpu_hot,'°C')],['GPU load',f(l.gpu_load,'%')],['CPU load',f(l.cpu_load,'%')],['CPU temp',l.cpu_temp==null?'n/a (needs driver)':f(l.cpu_temp,'°C')],['Board',f(l.board,'°C')]].map(k=>`<div><span class="sub">${k[0]}</span><b>${k[1]}</b></div>`).join('');
+  line(document.getElementById('cv2'),[rows.map(r=>r.gpu_core),rows.map(r=>r.gpu_hot),rows.map(r=>r.cpu_temp)],['#6aa7ff','#e5a93d','#4cc38a'],'°');
+  document.getElementById('sysnote').textContent='blue = GPU core, orange = GPU hot spot, green = CPU temp · '+Math.round(Date.now()/1000-l.t)+'s ago';
+}
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const openSteps=new Set(JSON.parse(localStorage.getItem('openSteps')||'[]'));let lastSteps='';
+function fileHtml(f){
+  const u=q('/files/'+f.path),ext=f.path.split('.').pop().toLowerCase(),kind=f.kind||(['jpg','jpeg','png','gif'].includes(ext)?'image':ext==='pdf'?'pdf':'text');
+  const cap=`<div class="fcap">${esc(f.name||f.path)} · <a href="${u}" target=_blank>open</a></div>`;
+  if(kind==='image')return `<div class="file">${cap}<a href="${u}" target=_blank><img loading=lazy src="${u}"></a></div>`;
+  if(kind==='pdf')return `<div class="file">${cap}<iframe src="${u}" loading=lazy></iframe></div>`;
+  return `<details class="file ftext" data-u="${u}"><summary>${esc(f.name||f.path)}</summary><pre>loading…</pre></details>`;
+}
+function renderSteps(steps){
+  const sig=JSON.stringify(steps);if(sig===lastSteps)return;lastSteps=sig;
+  document.getElementById('steps').innerHTML=steps.map((t,i)=>{
+    const body=(t.details?`<div class="det">${esc(t.details).replace(/\n/g,'<br>')}</div>`:'')+((t.files||[]).map(fileHtml).join(''));
+    return `<details class="step ${t.state}" data-k="${esc(t.title)}" ${openSteps.has(t.title)?'open':''}><summary><span class="dot"></span><div>${esc(t.title)}<small>${esc(t.note||'')}</small></div></summary>${body?`<div class="body">${body}</div>`:''}</details>`}).join('');
+  document.querySelectorAll('#steps > details.step').forEach(d=>d.addEventListener('toggle',()=>{d.open?openSteps.add(d.dataset.k):openSteps.delete(d.dataset.k);localStorage.setItem('openSteps',JSON.stringify([...openSteps]))}));
+  document.querySelectorAll('details.ftext').forEach(d=>d.addEventListener('toggle',async()=>{if(d.open&&!d.dataset.done){d.dataset.done=1;try{const r=await fetch(d.dataset.u);let t=await r.text();if(t.length>60000)t=t.slice(0,60000)+'\n… (truncated)';d.querySelector('pre').textContent=t}catch(e){d.querySelector('pre').textContent='failed: '+e}}}));
+}
+function hm(s){s=Math.max(0,Math.round(s));return Math.floor(s/3600)+'h '+String(Math.floor(s%3600/60)).padStart(2,'0')+'m'}
+function cloudPanel(c){
+  const k=document.getElementById('cloudk'),n=document.getElementById('cloudn'),j=document.getElementById('cloudj');
+  if(!c){k.innerHTML='<span class="sub">no cloud data yet</span>';n.textContent='';j.textContent='';return}
+  const age=Date.now()/1000-c.t,col=c.status==='active'?'#4cc38a':(c.status==='none'||c.status==='terminated')?'#8b91a1':'#e5a93d';
+  const g=c.gpu||{},cells=[['Instance',`<span style="color:${col}">${c.status}</span>`],['GPU',c.type||'—'],['Uptime',hm(c.uptime_s||0)],['Spend','$'+(c.cost||0).toFixed(2)+' / $'+c.budget],['Auto-stop in',c.deadline_in_s==null?'—':hm(c.deadline_in_s)]];
+  if(g.util!=null)cells.push(['GPU util',g.util+'%'],['VRAM',(g.mem_used/1024).toFixed(1)+' / '+(g.mem_total/1024).toFixed(0)+' GB'],['GPU temp',g.temp+'°C']);
+  k.innerHTML=cells.map(x=>`<div><span class="sub">${x[0]}</span><b>${x[1]}</b></div>`).join('');
+  n.textContent=(c.ip?c.ip+' · ':'')+(c.region||'')+' · '+(c.job_running?'job running':'no job running')+' · '+(c.price_hr?'$'+c.price_hr+'/hr · ':'')+'updated '+Math.round(age)+'s ago'+(age>60?' (monitor stale!)':'');
+  j.textContent=c.job_tail||'';
+}
 async function tick(){
   try{
     const r=await fetch(q('/api/state'));if(!r.ok){document.getElementById('upd').textContent='bad key';return}
     const s=await r.json(),st=s.status||{};
     document.getElementById('upd').textContent='updated '+new Date().toLocaleTimeString();
     document.getElementById('kv').innerHTML=(st.kv||[]).map(k=>`<div><span class="sub">${k[0]}</span><b>${k[1]}</b></div>`).join('')||'<span class="sub">—</span>';
-    document.getElementById('steps').innerHTML=(st.steps||[]).map(t=>`<div class="step ${t.state}"><span class="dot"></span><div>${t.title}<small>${t.note||''}</small></div></div>`).join('');
-    chart(s.metrics);
+    renderSteps(st.steps||[]);
+    chart(s.metrics);sysPanel(s.sys||[]);cloudPanel(s.cloud);
     document.getElementById('imgs').innerHTML=s.images.map(n=>`<a href="${q('/files/samples/'+n)}" target=_blank><img loading=lazy src="${q('/files/samples/'+n)}"></a>`).join('');
     if(s.files.length)document.getElementById('files').innerHTML=s.files.map(f=>`<a href="${q('/files/'+f)}" target=_blank>${f}</a>`).join(' · ');
     const L=document.getElementById('log');const stick=L.scrollTop+L.clientHeight>=L.scrollHeight-20;

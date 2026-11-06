@@ -31,3 +31,7 @@ __pycache__/
 .venv*/
 .pw-profile/
 secrets/
+blender/assets/
+blender/renders/
+dashboard/cloud.json
+NUL
