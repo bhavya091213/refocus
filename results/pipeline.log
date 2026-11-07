@@ -1,0 +1,16 @@
+[19:37:06] PIPELINE 8x START steps=4000 (global batch 2) eval=20 scenes x 1,4,7
+[19:37:06] EVAL START authors200k on GPU 6 (20 scenes x positions 1,4,7)
+[19:37:06] TRAIN START armA_random (conditioning=random, 4000 steps, GPUs 0,1)
+[19:37:06] TRAIN START armB_ablate_position (conditioning=ablate_position, 4000 steps, GPUs 2,3)
+[19:37:06] TRAIN START armC_ablate_time (conditioning=ablate_time, 4000 steps, GPUs 4,5)
+[20:49:22] EVAL DONE authors200k: PSNR 31.0666 SSIM 0.8929 LPIPS 0.1602 depth-rho -0.6979
+[21:34:59] TRAIN DONE armC_ablate_time
+[21:34:59] EVAL START armC_ablate_time on GPU 4 (20 scenes x positions 1,4,7)
+[21:35:01] TRAIN DONE armB_ablate_position
+[21:35:02] EVAL START armB_ablate_position on GPU 2 (20 scenes x positions 1,4,7)
+[21:35:48] TRAIN DONE armA_random
+[21:35:48] EVAL START armA_random on GPU 0 (20 scenes x positions 1,4,7)
+[22:46:56] EVAL DONE armB_ablate_position: PSNR 29.1054 SSIM 0.8625 LPIPS 0.1961 depth-rho -0.5762
+[22:47:03] EVAL DONE armC_ablate_time: PSNR 28.6153 SSIM 0.8575 LPIPS 0.1993 depth-rho -0.6072
+[22:47:50] EVAL DONE armA_random: PSNR 28.7574 SSIM 0.8703 LPIPS 0.1915 depth-rho -0.6147
+[22:47:51] PIPELINE ALL DONE

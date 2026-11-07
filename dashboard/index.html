@@ -28,19 +28,55 @@ pre{margin:0;max-height:260px;overflow:auto;font:12px/1.4 ui-monospace,Consolas,
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .grid img{width:100%;border-radius:6px}
 a{color:var(--acc)}.kv{display:flex;gap:18px;flex-wrap:wrap}.kv div b{display:block;font-size:20px}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 4px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+.tab{background:var(--card);border:1px solid #232734;color:var(--mut);padding:7px 14px;border-radius:999px;cursor:pointer;font:inherit;font-size:14px}
+.tab.on{background:var(--acc);color:#0b1020;border-color:var(--acc);font-weight:600}
+.pane{display:none}.pane.on{display:block}
+table.rt{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}.rt th,.rt td{padding:6px 8px;border-bottom:1px solid #232734;text-align:right}.rt th:first-child,.rt td:first-child{text-align:left}
+.rt th{color:var(--mut);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.04em}.rt td.best{color:var(--ok);font-weight:700}
+.bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.bars canvas{height:170px}
+.sel{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.sel select{background:#10131a;color:var(--fg);border:1px solid #232734;border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
+.note{font-size:13px;color:#c9cfdd;background:#10131a;border-left:3px solid var(--acc);padding:8px 12px;border-radius:6px;margin:8px 0;line-height:1.55}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:#232734;color:var(--mut)}
+.dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.dl .it{background:#10131a;border-radius:10px;padding:10px 12px}.dl .it b{display:block}.dl .it video{width:100%;border-radius:6px;margin-top:6px}
+.scroll{max-height:380px;overflow:auto}
 </style></head><body>
 <h1>Learning to Refocus — project monitor</h1>
 <div class="sub" id="upd">loading…</div>
 
-<div class="card"><h2>Now</h2><div class="kv" id="kv"></div></div>
+<div class="tabs" id="tabs"><button class="tab on" data-t="ov">Overview</button><button class="tab" data-t="res">Results</button><button class="tab" data-t="tr">Training</button><button class="tab" data-t="hw">Cloud &amp; hardware</button><button class="tab" data-t="dl">Deliverables</button><button class="tab" data-t="lg">Log</button></div>
+<div class="pane on" id="p-ov"><div class="card"><h2>Now</h2><div class="kv" id="kv"></div></div>
 <div class="card"><h2>Plan / progress</h2><div id="steps"></div></div>
-<div class="card"><h2>Lambda cloud</h2><div class="kv" id="cloudk"></div><div class="sub" id="cloudn" style="margin-top:8px"></div><pre id="cloudj" style="max-height:90px;margin-top:6px"></pre></div>
+</div>
+<div class="pane" id="p-res"><div class="card"><h2>Final results · 20 held-out scenes × input positions 1, 4, 7</h2><div id="restab"></div><div class="note" id="resnote"></div></div>
+<div class="card"><h2>Metric comparison</h2><div class="bars"><canvas id="b_psnr" width="520" height="340"></canvas><canvas id="b_ssim" width="520" height="340"></canvas><canvas id="b_lpips" width="520" height="340"></canvas><canvas id="b_rho" width="520" height="340"></canvas></div></div>
+<div class="card"><h2>Paired comparisons (same 60 items) <span class="sub" style="text-transform:none;letter-spacing:0">mean difference a − b · t · items where a &gt; b</span></h2><div id="pairtab"></div></div>
+<div class="card"><h2>PSNR by distance between input and target position</h2><canvas id="dist" width="900" height="260" style="height:240px"></canvas><div class="sub" id="distl"></div></div>
+<div class="card"><h2>PSNR by input position</h2><div id="postab"></div></div>
+<div class="card"><h2>Generated vs ground-truth stacks</h2><div class="sel"><select id="selm"></select><select id="selp"></select></div><div id="sheet"></div><div class="sub">rows: ground truth (top) and generated (bottom), 9 focus positions each; first column block uses the labelled input position.</div></div>
+<div class="card"><h2>Per-scene PSNR</h2><div class="scroll" id="scenetab"></div></div></div>
+<div class="pane" id="p-tr"><div class="card"><h2>Training loss</h2><canvas id="cv" width="900" height="220"></canvas><div class="sub" id="cvlab"></div></div>
+<div class="card"><h2>Training setup (identical for the 3 arms except <code>conditioning</code>)</h2><table class="rt"><tr><th>Setting</th><th style="text-align:left">Value</th></tr>
+<tr><td>Base model</td><td style="text-align:left">Stable Video Diffusion img2vid (VAE + CLIP frozen)</td></tr>
+<tr><td>Trained parameters</td><td style="text-align:left">UNet temporal transformer blocks only</td></tr>
+<tr><td>Loss</td><td style="text-align:left">EDM, σ ~ LogNormal(0.7, 1.6), weight (1+σ²)/σ², 10% condition dropout</td></tr>
+<tr><td>Optimiser</td><td style="text-align:left">AdamW, lr 1e-5 × scale_lr 2 = 2e-5, constant</td></tr>
+<tr><td>Batch / GPUs</td><td style="text-align:left">1 per GPU × 2 GPUs (DDP) = 2; bf16 + gradient checkpointing</td></tr>
+<tr><td>Steps</td><td style="text-align:left">4,000 (8,000 samples, ≈5.4 epochs of 1,474 scenes) · authors: 200,000</td></tr>
+<tr><td>Speed / time</td><td style="text-align:left">1.77 s/step · 1 h 58 min per arm, three arms in parallel</td></tr>
+<tr><td>Resolution</td><td style="text-align:left">640 × 896, 9 frames</td></tr></table>
+<div class="note">Loss is one noisy diffusion draw per step, so the curves above are a 15-point moving average and are not a quality measure. The three curves almost coincide, most likely because all arms use seed 0 and so see the same scenes and noise levels at each step; the ups and downs are the data, not training instability — compare the arms on held-out metrics (Results tab).</div></div></div>
+<div class="pane" id="p-hw"><div class="card"><h2>Lambda cloud</h2><div class="kv" id="cloudk"></div><div class="sub" id="cloudn" style="margin-top:8px"></div><pre id="cloudj" style="max-height:90px;margin-top:6px"></pre></div>
 <div class="card"><h2>GPU details <span class="sub" id="gpun" style="text-transform:none;letter-spacing:0"></span></h2><div id="gpus"></div><div id="gextra"></div></div>
 <div class="card"><h2>This PC (temperatures)</h2><div class="kv" id="sysk"></div><canvas id="cv2" width="900" height="160" style="height:140px;margin-top:10px"></canvas><div class="sub" id="sysnote"></div></div>
-<div class="card"><h2>Training loss</h2><canvas id="cv" width="900" height="220"></canvas><div class="sub" id="cvlab"></div></div>
-<div class="card"><h2>Latest samples</h2><div class="grid" id="imgs"></div></div>
+</div>
+<div class="pane" id="p-dl"><div class="card"><h2>Deliverables</h2><div class="dl" id="dlist"></div></div><div class="card"><h2>Latest samples</h2><div class="grid" id="imgs"></div></div>
 <div class="card"><h2>Downloads</h2><div id="files" class="sub">none yet</div></div>
-<div class="card"><h2>Log</h2><pre id="log"></pre></div>
+</div>
+<div class="pane" id="p-lg"><div class="card"><h2>Log</h2><pre id="log"></pre></div>
+
+</div>
 
 <script>
 const key=new URLSearchParams(location.search).get('key')||'';
@@ -168,5 +204,53 @@ async function tick(){
     L.textContent=s.logs.map(l=>new Date(l.t*1000).toLocaleTimeString()+' '+(l.run?'['+l.run+'] ':'')+l.line).join('\n');if(stick)L.scrollTop=L.scrollHeight;
   }catch(e){document.getElementById('upd').textContent='offline: '+e}
 }
+// ---- tabs
+function showTab(t){document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+t));document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));localStorage.setItem('tab',t);if(t==='res')loadResults();if(t==='dl')loadDeliv()}
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.t)));
+// ---- results
+let RES=null;const MC={authors200k:'#8b91a1',armA_random:'#6aa7ff',armB_ablate_position:'#e5a93d',armC_ablate_time:'#4cc38a'};
+async function loadResults(){
+  if(!RES){try{RES=await (await fetch(q('/files/results/summary.json'))).json()}catch(e){document.getElementById('restab').textContent='results not available: '+e;return}drawResults()}
+}
+function bestIdx(vals,hi){let b=-1;vals.forEach((v,i)=>{if(i===0)return;if(b<0||(hi?v>vals[b]:v<vals[b]))b=i});return b}
+function drawResults(){
+  const M=RES.models,f=(v,d)=>(+v).toFixed(d);
+  const cols=[['psnr','PSNR (dB)',2,true],['ssim','SSIM',3,true],['lpips','LPIPS',3,false],['rho','Depth-consistency ρ',2,false]];
+  const best={};cols.forEach(c=>best[c[0]]=bestIdx(M.map(m=>m[c[0]]),c[3]));
+  document.getElementById('restab').innerHTML='<table class="rt"><tr><th>Model</th>'+cols.map(c=>`<th>${c[1]}${c[3]?' ↑':' ↓'}</th>`).join('')+'</tr>'+M.map((m,i)=>`<tr><td><span style="color:${MC[m.key]}">●</span> ${esc(m.name)}</td>`+cols.map(c=>`<td class="${best[c[0]]===i?'best':''}">${f(m[c[0]],c[2])}${m[c[0]+'_se']!=null?' <span class="sub">±'+f(m[c[0]+'_se'],c[2]===2?2:3)+'</span>':''}</td>`).join('')+'</tr>').join('')+`<tr><td class="sub">Real stacks (reference)</td><td></td><td></td><td></td><td class="sub">${f(M[0].gt_rho,2)}</td></tr></table>`;
+  document.getElementById('resnote').innerHTML='<b>Reading it.</b> Green = best of <i>our</i> three arms (the authors\' checkpoint trained 50× longer and is the upper bound). Slot-based conditioning (A, B) beats the motion-bucket encoding (C); A vs B is a PSNR (B) vs SSIM/LPIPS (A) trade-off. Depth-consistency ρ: more negative = sharpest frame follows depth like real stacks (−0.76).';
+  cols.forEach(c=>bars(document.getElementById('b_'+c[0]),M,c[0],c[1],c[3]));
+  document.getElementById('pairtab').innerHTML='<table class="rt"><tr><th>a vs b</th><th>ΔPSNR</th><th>ΔSSIM</th><th>ΔLPIPS</th></tr>'+RES.paired.map(p=>`<tr><td>${esc(p.a)}<br><span class="sub">vs ${esc(p.b)}</span></td>`+['psnr','ssim','lpips'].map(q=>{const r=p[q];return `<td>${r.mean>=0?'+':''}${r.mean.toFixed(q==='psnr'?2:4)}<br><span class="sub">t=${r.t.toFixed(1)} · ${r.wins}/${r.n}</span></td>`}).join('')+'</tr>').join('')+'</table><div class="sub" style="margin-top:6px">t = mean/s.e. of per-item differences; the 3 input positions of a scene are not independent, so t is a rough guide. For LPIPS lower is better.</div>';
+  // distance curves
+  const c=document.getElementById('dist'),x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);
+  const ds=['1','2','3','4','5','6','7'],all=M.flatMap(m=>ds.map(d=>RES.by_dist[m.key][d])).filter(v=>v!=null),lo=Math.floor(Math.min(...all))-1,hi=Math.ceil(Math.max(...all));
+  x.font='11px sans-serif';x.fillStyle='#8b91a1';x.strokeStyle='#232734';
+  for(let v=lo;v<=hi;v++){const py=c.height-28-(v-lo)/(hi-lo)*(c.height-44);x.beginPath();x.moveTo(36,py);x.lineTo(c.width-8,py);x.stroke();x.fillText(v+' dB',2,py+4)}
+  ds.forEach((d,i)=>x.fillText('Δ'+d,36+i/6*(c.width-60)-6,c.height-10));
+  M.forEach(m=>{x.strokeStyle=MC[m.key];x.lineWidth=2;x.beginPath();ds.forEach((d,i)=>{const v=RES.by_dist[m.key][d];const px=36+i/6*(c.width-60),py=c.height-28-(v-lo)/(hi-lo)*(c.height-44);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()});
+  document.getElementById('distl').innerHTML=M.map(m=>`<span style="color:${MC[m.key]}">● ${esc(m.name)}</span>`).join(' &nbsp; ')+' · x = |target − input| position; error grows with distance.';
+  document.getElementById('postab').innerHTML='<table class="rt"><tr><th>Model</th><th>input 1</th><th>input 4</th><th>input 7</th></tr>'+M.map(m=>`<tr><td>${esc(m.name)}</td>`+['1','4','7'].map(p=>`<td>${f(m.psnr_by_pos[p],2)}</td>`).join('')+'</tr>').join('')+'</table>';
+  const sm=document.getElementById('selm'),sp=document.getElementById('selp');
+  sm.innerHTML=M.map(m=>`<option value="${m.key}">${esc(m.name)}</option>`).join('');sp.innerHTML=['1','4','7'].map(p=>`<option value="${p}">input position ${p}</option>`).join('');
+  const show=()=>{document.getElementById('sheet').innerHTML=`<a target=_blank href="${q('/files/results/'+sm.value+'/sheet_in'+sp.value+'.jpg')}"><img style="width:100%;border-radius:8px" src="${q('/files/results/'+sm.value+'/sheet_in'+sp.value+'.jpg')}"></a>`};sm.onchange=sp.onchange=show;show();
+  const keys=M.map(m=>m.key);
+  document.getElementById('scenetab').innerHTML='<table class="rt"><tr><th>Scene</th>'+M.map(m=>`<th style="color:${MC[m.key]}">${m.key==='authors200k'?'authors':m.key.slice(3,4)}</th>`).join('')+'</tr>'+RES.scenes.map(r=>`<tr><td class="sub">${esc(r.scene)}</td>`+keys.map(k=>`<td>${r[k].toFixed(2)}</td>`).join('')+'</tr>').join('')+'</table>';
+}
+function bars(c,M,k,title,hi){
+  const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);const v=M.map(m=>m[k]),ab=v.map(Math.abs);
+  const mn=Math.min(...ab),mx=Math.max(...ab),lo=Math.max(0,mn-(mx-mn)*1.2),span=(mx-lo)||1;
+  x.fillStyle='#e6e8ee';x.font='bold 13px sans-serif';x.fillText(title+(hi?' ↑':' ↓'),8,18);x.fillStyle='#8b91a1';x.font='11px sans-serif';x.fillText('bars start at '+lo.toFixed(k==='psnr'||k==='rho'?1:2)+' (axis truncated)',8,c.height-2);
+  const bw=(c.width-40)/M.length;
+  M.forEach((m,i)=>{const h=(ab[i]-lo)/span*(c.height-110)+10,px=20+i*bw+8,py=c.height-50-h;x.fillStyle=MC[m.key];x.fillRect(px,py,bw-16,h);
+    x.fillStyle='#e6e8ee';x.font='12px sans-serif';x.textAlign='center';x.fillText((+v[i]).toFixed(k==='psnr'||k==='rho'?2:3),px+(bw-16)/2,py-5);
+    x.fillStyle='#8b91a1';x.fillText(m.key==='authors200k'?'authors':m.key.slice(3,4),px+(bw-16)/2,c.height-30);x.fillText(m.key==='authors200k'?'200k':({armA_random:'random',armB_ablate_position:'abl. pos',armC_ablate_time:'abl. time'})[m.key],px+(bw-16)/2,c.height-14);x.textAlign='left'});
+}
+// ---- deliverables
+let DLV=null;
+async function loadDeliv(){
+  if(DLV)return;try{DLV=await (await fetch(q('/files/deliverables.json'))).json();if(!Array.isArray(DLV))throw 0}catch(e){DLV=null;document.getElementById('dlist').textContent='none yet';return}
+  document.getElementById('dlist').innerHTML=DLV.map(d=>`<div class="it"><b>${esc(d.title)}</b><div class="sub">${esc(d.desc||'')}</div><div style="margin-top:6px">${(d.links||[]).map(l=>`<a target=_blank href="${l.local?esc(l.href):q('/files/'+l.href)}">${esc(l.label)}</a>`).join(' · ')}</div>${d.video?`<video controls preload=none src="${q('/files/'+d.video)}"></video>`:''}${d.image?`<a target=_blank href="${q('/files/'+d.image)}"><img style="width:100%;border-radius:6px;margin-top:6px" src="${q('/files/'+d.image)}"></a>`:''}</div>`).join('');
+}
+showTab(localStorage.getItem('tab')||'ov');
 tick();setInterval(tick,5000);
 </script></body></html>

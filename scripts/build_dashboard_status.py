@@ -116,19 +116,20 @@ STEPS.append(dict(title="Ablation chosen: random vs ablate_position vs ablate_ti
     files=F(put("s7", "conditioning_modes.py", text=lines(runner, 462, 547)), put("s7", "svd_pipeline_conditioning_inference.py", text=lines(CODE + "training/svd_pipeline.py", 557, 590)))))
 
 # 8 ---------------------------------------------------------------------------------------------------------
-STEPS.append(dict(title="Fine-tune the 3 arms on 8x A100 (parallel) + evaluate", state="doing", note="instance setup in progress; training starts when ready",
+STEPS.append(dict(title="Fine-tune the 3 arms on 8x A100 (parallel) + evaluate", state="done", note="4,000 steps each in 1h58m · all evals done · instance terminated · 3.39 h = $53.93",
     details="Budget changed by the user to up to $20/hr for ~3 hours. Instance: 8x A100 40GB (gpu_8x_a100, us-east-1) at $15.92/hr = $1.99 per GPU-hour, the same rate as one GPU: parallelism buys SPEED, not cheaper compute. Hard cap $65 enforced by a local watchdog.\n"
             "LAYOUT: GPUs 0-1 arm A (random) | 2-3 arm B (ablate_position) | 4-5 arm C (ablate_time) | 6 authors' checkpoint evaluation | 7 spare (Blender macro scene). Each arm trains with 2-GPU data parallelism, then is evaluated on its own GPU.\n"
             "TRAINING (identical for all arms except `conditioning`): SVD base, only temporal transformer blocks trained, seed 0, bf16 + gradient checkpointing, per-GPU batch 1 (global 2), lr 1e-5 x scale_lr 2 = 2e-5, AdamW, 4,000 steps = 8,000 samples (~5.4 passes over the 1,474 train scenes), checkpoints every 1,000 steps.\n"
             "DEVIATIONS from the authors (to state in the report): bf16 + checkpointing (fp32 OOMs on 40GB), 4,000 vs 200,000 steps (2%), no EMA, their hardware/batch is not stated, in-training validation disabled (crashes under bf16).\n"
             "EVALUATION (fixed subset): 20 test scenes x input positions {1,4,7} = 60 generations per model; metrics on the 8 non-input frames: PSNR, SSIM, LPIPS(vgg) + depth-consistency score (Spearman of sharpest-frame index vs monocular disparity). FID/VIF not reported (too few images).\n"
             "Pipeline smoke test (authors' checkpoint, 2 scenes x 3 positions): PSNR 32.7, SSIM 0.934, LPIPS 0.195, depth-rho -0.21 (real stacks -0.52). Pipeline works; numbers are from only 6 generations.\n"
-            "Loss curves per run stream into the chart above; per-GPU metadata is in 'GPU details'.",
+            "RESULT: authors 200k PSNR 31.07 / SSIM .893 / LPIPS .160; A random 28.76 / .870 / .192; B ablate_position 29.11 / .863 / .196; C ablate_time 28.62 / .858 / .199. Paired over the same 60 items: B beats C on all metrics (PSNR +0.49 dB, 55/60 items); A beats C on SSIM/LPIPS; A vs B is a PSNR (B) vs SSIM/LPIPS (A) trade-off. Full tables and charts: Results tab.\n"
+            "COST: launched 19:24 UTC, terminated 22:48 UTC = 3.39 h x $15.92/h = $53.93 of the $100 cap. The 25 GB checkpoints per arm were not downloaded (instance terminated), so the demo uses the authors' weights.",
     files=F(put("s8", "run_ablation_8x.sh", R + "scripts/run_ablation_8x.sh"), put("s8", "eval_metrics.py", R + "scripts/eval_metrics.py"), put("s8", "remote_patch.py", R + "scripts/remote_patch.py"),
             put("s8", "setup_new_instance.sh", R + "scripts/setup_new_instance.sh"))))
 
 # 9 ---------------------------------------------------------------------------------------------------------
-STEPS.append(dict(title="Blender demo scenes (CC0 assets) -> model", state="doing", note="renders done · inference running",
+STEPS.append(dict(title="Blender demo scenes (CC0 assets) -> model", state="done", note="3 scenes rendered · authors' model gives plausible near-to-far sweep, 1-3 position errors",
     details="For the demo: build depth-layered scenes in Blender 4.5 from public-domain (CC0) Poly Haven models + HDRI lighting, render a TRUE ground-truth focal stack with Blender's thin-lens depth of field (9 focus distances), then give ONE frame to the model and compare its generated stack to the ground truth.\n"
             "Scenes: 'still_life' (duck 0.8 m, apple 0.9 m, bust 1.7 m, plant 3 m, cat 4.8 m) and 'garden' (rocks, duck, bust, tree, plant).\n"
             "Assets (CC0): marble_bust_01, potted_plant_02, rubber_duck_toy, food_apple_01, concrete_cat_statue, rock_moss_set_01, tree_small_02; HDRIs studio_small_09, kloofendal_48d_partly_cloudy_puresky. All from polyhaven.com.\n"
@@ -164,7 +165,7 @@ for extra in ():
     if f: STEPS[-1]["files"].append(f)
 
 # 13 extra credit --------------------------------------------------------------------------------------------
-STEPS.append(dict(title="Extra credit: depth mapping and focus", state="doing", note="mono-depth agrees with focus stack: mean Spearman -0.80 (16 scenes)",
+STEPS.append(dict(title="Extra credit: depth mapping and focus", state="done", note="mono-depth agrees with focus stack: mean Spearman -0.80 (16 scenes)",
     details="Question: can depth help our refocusing predictions? In a focal stack the frame sharpest at a pixel is a depth proxy (depth-from-focus).\n"
             "EXPERIMENT 1 (done, real dataset, no training): 16 test scenes. Per pixel: index of the sharpest frame (abs Laplacian, 21x21 box) vs relative disparity from Depth Anything V2 Small on the middle frame; Spearman on the 40% most textured pixels.\n"
             "RESULT: mean rho = -0.80, all 16 scenes negative (range -0.97 to -0.35). Near pixels are sharpest at low positions, far at high. Median disparity of pixels sharpest at position 0..8: 0.59, 0.70, 0.70, 0.61, 0.48, 0.45, 0.26, 0.19, 0.22 (roughly flat over 0-2, then falling).\n"
@@ -181,18 +182,18 @@ STEPS.append(dict(title="Extra credit: depth mapping and focus", state="doing", 
 STEPS[-1]["files"].append({"name": "depth_vs_focus.json", "path": "steps/s13/depth_vs_focus.json"})
 
 # 10-12 -----------------------------------------------------------------------------------------------------
-STEPS.append(dict(title="Metrics on a test subset", state="todo", note="PSNR · SSIM · LPIPS · FID · VIF",
+STEPS.append(dict(title="Metrics on a test subset", state="done", note="PSNR · SSIM · LPIPS · depth-consistency on 20 scenes x 3 input positions x 4 models (FID/VIF not run)",
     details="Authors' extra/compute_metrics.py computes PSNR, SSIM, LPIPS (VGG), FID, VIF for every (input position, output position) pair over 164 test scenes. Full test = ~26 GPU-hours, so we will evaluate a fixed subset (same scenes/positions for every model) and say so in the report."))
-STEPS.append(dict(title="Click-to-refocus demo + Remotion animations", state="todo", note="sharpness data computed from real frames",
+STEPS.append(dict(title="Click-to-refocus demo + Remotion animations", state="done", note="viewer/ (8 sample stacks) · remotion/ scenes rendered",
     details="Click-to-refocus: local sharpness = variance of the Laplacian in a window around the clicked pixel, per generated frame; show the argmax frame. Real sample (from actual dataset frames): click (200,320) -> frame 0 sharpest; click (200,40) -> frame 7 sharpest.\n"
-            "Remotion project scaffolded in D:\\Refocus\\remotion (sample frames + real sharpness data ready); animation scenes still to be written.",
+            "Viewer: D:\\Refocus\\viewer (static web app: click picks sharpest frame, sharpness-vs-position plot, depth-like map, upload 9 frames). Remotion animations: D:\\Refocus\\remotion. See the Deliverables tab.",
     files=F(put("s11", "sharpness_samples.py", R + "scripts/sharpness_samples.py"), put("s11", "sharpness.json", R + "remotion/src/sharpness.json"))))
-STEPS.append(dict(title="Report (LaTeX) + 3 slides", state="doing", note="architecture + data sections written",
-    details="Report sections drafted: problem, why a video model, SVD, EDM loss, what is fine-tuned, hyperparameters, data + preprocessing log. Placeholders (red TBD) for results. Slides: 3 slides / 3 minutes not started.",
+STEPS.append(dict(title="Report (LaTeX) + 3 slides", state="done", note="full report incl. results, paired analysis, limitations · 3-slide deck",
+    details="Report sections drafted: problem, why a video model, SVD, EDM loss, what is fine-tuned, hyperparameters, data + preprocessing log. Results, paired-comparison analysis, compute budget, limitations and conclusion are written. 3-slide / 3-minute deck is in D:\\Refocus\\slides.",
     files=F(put("s12", "report.pdf", R + "report/main.pdf"))))
 
-status = {"kv": [["Phase", "Blender demo + training plan"], ["Base model", "SVD img2vid"], ["Train / test scenes", "1474 / 164"], ["Cloud", "1x A100 40GB, $1.99/hr"],
-                 ["Train speed", "1.71 s/step (bf16)"], ["Ablation", "not chosen yet"]], "steps": STEPS}
+status = {"kv": [["Phase", "Finished: results in, deliverables built"], ["Base model", "SVD img2vid"], ["Train / test scenes", "1474 / 164"], ["Cloud", "terminated · $53.93 of $100"],
+                 ["Best of ours", "A random (SSIM/LPIPS) / B ablate_position (PSNR)"], ["Authors' 200k", "PSNR 31.07 · LPIPS 0.160"]], "steps": STEPS}
 json.dump(status, open(R + "dashboard/status.json", "w", encoding="utf-8"))
 key = open(R + "dashboard/token.txt").read().strip()
 urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:8791/api/status?key={key}", data=json.dumps(status).encode(), headers={"Content-Type": "application/json"}), timeout=10).read()

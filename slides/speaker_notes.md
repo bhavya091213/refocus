@@ -1,0 +1,13 @@
+# Speaker script (3 minutes, about 180 s)
+
+## Slide 1
+
+SLIDE 1 (about 55 seconds). Phones and cameras bake the focus into a photo. Our project: give the model one image, and let you click anywhere to refocus it afterwards. We do that by generating a focal stack: nine frames from near to far, like a tiny video where only the focus plane moves. That is why we start from a video diffusion model, Stable Video Diffusion, as in the SIGGRAPH Asia 2025 paper by Tedla and colleagues, which we credit and reproduce. We keep the image encoder and decoder frozen and fine-tune only the temporal transformer blocks, the part that links frames to each other. The top right shows three real frames from one training stack: near, middle, far. The row at the bottom is the pipeline: one photo, the video model, nine frames, and then your click simply picks the frame that is sharpest at that pixel.
+
+## Slide 2
+
+SLIDE 2 (about 65 seconds). We trained three versions of the model, which is our ablation. A tells the model the input's focus position by putting the input photo in the matching slot of the nine frames, as the authors do. B hides the position: the photo is copied into every slot. C passes the position as a single number through the motion-bucket input instead. We trained each for 4,000 steps on eight A100 GPUs, about 3.4 hours and about 54 dollars, which is only 2 percent of the authors' 200,000 steps. Then we tested on 20 held-out scenes at three input positions. The authors' checkpoint wins everywhere, as expected. Among ours, C is clearly weakest: on the same 60 items B beats it by about half a decibel, in 55 out of 60. A versus B is a trade-off: B has higher PSNR, A has better SSIM and LPIPS. Honest caveat: one seed, short training, 20 scenes.
+
+## Slide 3
+
+SLIDE 3 (about 60 seconds). For the demo we also built test scenes in Blender with free Poly Haven assets and real thin-lens blur, so we know the true focus stack. On the left, the top row is the ground truth and the middle row is what the model produced from one photo: it sweeps focus from near to far in a believable order, but its sharpest frames land one to three positions off, and we cannot yet tell whether that is our guess about the focus distances or the synthetic-to-real gap. For extra credit we checked a link to depth: the frame where each pixel is sharpest correlates with monocular depth, Spearman minus 0.80, which suggests depth could help future versions. The click-to-refocus viewer lets you click a pixel and shows the nearest frame. Limits: short training, one seed, 20 test scenes. This builds on Tedla and colleagues, SIGGRAPH Asia 2025, which we credit on every slide. Thank you.

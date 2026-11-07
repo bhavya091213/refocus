@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Click-to-refocus viewer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Click-to-refocus</h1>
+  <p class="sub">Click anywhere on the image: the viewer picks the frame of the 9-frame focal stack that is sharpest at that spot.
+     Idea and model from Tedla et al., <a href="https://learn2refocus.github.io/" target="_blank" rel="noopener">&ldquo;Learning to Refocus with Video Diffusion Models&rdquo;</a> (SIGGRAPH Asia 2025).</p>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="toolbar">
+      <label>Stack
+        <select id="stackSel"></select>
+      </label>
+      <label class="chk"><input type="checkbox" id="depthChk"> Show depth-like map</label>
+      <button id="sweepBtn" type="button">Sweep near &rarr; far</button>
+      <label class="upload">Upload 9 frames
+        <input type="file" id="upload" accept="image/*" multiple>
+      </label>
+    </div>
+
+    <div class="canvasWrap" id="wrap">
+      <canvas id="view" width="640" height="896"></canvas>
+      <canvas id="depth" width="640" height="896"></canvas>
+      <div id="cross" hidden></div>
+      <div id="hint">Click the image to refocus</div>
+    </div>
+
+    <div class="sliderRow">
+      <span>near</span>
+      <input type="range" id="slider" min="0" max="8" step="1" value="0" aria-label="Focus position">
+      <span>far</span>
+    </div>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <aside class="side">
+    <div class="card">
+      <h2>Current focus</h2>
+      <div class="big"><span id="posNum">-</span><small> / 8</small></div>
+      <p id="posNote" class="muted">No point selected yet.</p>
+      <p id="info" class="muted"></p>
+    </div>
+    <div class="card">
+      <h2>Sharpness vs. position</h2>
+      <canvas id="plot" width="320" height="170"></canvas>
+      <p class="muted small">Local sharpness (variance of the Laplacian in a window around the click), normalised. The orange bar is the chosen frame.</p>
+    </div>
+    <div class="card">
+      <h2>About this stack</h2>
+      <p id="about" class="muted"></p>
+      <p class="muted small">Position 0 &asymp; 5&nbsp;cm &hellip; 8 &asymp; infinity (per the authors' README; the exact spacing is not documented, so treat the order, not the distance, as reliable).</p>
+    </div>
+  </aside>
+</main>
+
+<footer>Sharpness is computed in your browser from the frames; nothing is uploaded anywhere. Credit: Tedla, Zhang, Zhang, Xin, <em>Learning to Refocus with Video Diffusion Models</em>, SIGGRAPH Asia 2025.</footer>
+<script src="app.js"></script>
+</body>
+</html>
