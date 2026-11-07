@@ -5,7 +5,7 @@ KEY="$HOME/.ssh/lambda_parakeet_ed25519"; SO="-o StrictHostKeyChecking=no -o Con
 SSH() { ssh -i $KEY $SO ubuntu@$IP "$@"; }
 until SSH 'echo up' >/dev/null 2>&1; do sleep 10; done; echo "ssh up $(date -u +%T)"
 # 1) environment + model downloads on the instance (background there)
-scp -q -i $KEY $SO scripts/remote_setup.sh scripts/remote_patch.py scripts/eval_metrics.py scripts/run_ablation_8x.sh logs/dash.env ubuntu@$IP:~/
+scp -q -i $KEY $SO scripts/remote_setup.sh scripts/remote_patch.py scripts/eval_metrics.py scripts/run_ablation_8x.sh scripts/run_single_arm.sh logs/dash.env ubuntu@$IP:~/
 SSH 'mv ~/dash.env ~/dash.env; mkdir -p ~/refocus; (nohup bash ~/remote_setup.sh > ~/setup.log 2>&1 &); echo env-setup started'
 # 2) code + dataset upload (parallel with the env install)
 tar --exclude=.git -cf - -C code learn2refocus | SSH 'tar -xf - -C ~/refocus' && echo "code uploaded"

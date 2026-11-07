@@ -13,7 +13,7 @@ if cp(R + "slides/refocus_slides.pdf", "slides.pdf"):
     cp(R + "slides/refocus_slides.pptx", "slides.pptx"); cp(R + "slides/speaker_notes.md", "slides_notes.md")
     D.append(dict(title="3-slide presentation (3 min)", desc="Problem + approach, results + ablation, demo + extras. Speaker notes timed to 60 s per slide.", links=[dict(label="PDF", href="slides.pdf"), dict(label=".pptx", href="slides.pptx"), dict(label="speaker notes", href="slides_notes.md")]))
 if os.path.isdir(R + "viewer"):
-    D.append(dict(title="Click-to-refocus viewer", desc="Static web app in D:\\Refocus\\viewer. Click any pixel: the sharpest of 9 frames is shown, with a sharpness-vs-position plot and depth-like map. Run: python -m http.server 8765 in that folder.", links=[dict(label="README", href="viewer/README.md")]))
+    D.append(dict(title="Click-to-refocus viewer", desc="Static web app in D:\\Refocus\\viewer. Click any pixel: the sharpest of 9 frames is shown, with a sharpness-vs-position plot and depth-like map. Run: python -m http.server 8765 in that folder.", links=[dict(label="open demo", href="__VIEWER__", local=True), dict(label="README", href="viewer/README.md")]))
     cp(R + "viewer/README.md", "viewer/README.md")
 for mp4 in sorted(glob.glob(R + "remotion/out/*.mp4")):
     n = os.path.basename(mp4); cp(mp4, "remotion/" + n)

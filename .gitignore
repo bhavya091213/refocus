@@ -41,3 +41,8 @@ remotion/node_modules/
 slides/node_modules/
 viewer/__pycache__/
 results/*.tgz
+dashboard/gen/
+local_infer/
+logs/
+*.safetensors
+checkpoints/

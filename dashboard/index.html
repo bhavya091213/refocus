@@ -45,6 +45,7 @@ table.rt{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 <h1>Learning to Refocus — project monitor</h1>
 <div class="sub" id="upd">loading…</div>
 
+<a id="demobtn" class="tab on" style="display:inline-block;margin:10px 0 0;text-decoration:none;font-weight:600" target=_blank>▶ Open click-to-refocus demo (works on phone)</a>
 <div class="tabs" id="tabs"><button class="tab on" data-t="ov">Overview</button><button class="tab" data-t="res">Results</button><button class="tab" data-t="tr">Training</button><button class="tab" data-t="hw">Cloud &amp; hardware</button><button class="tab" data-t="dl">Deliverables</button><button class="tab" data-t="lg">Log</button></div>
 <div class="pane on" id="p-ov"><div class="card"><h2>Now</h2><div class="kv" id="kv"></div></div>
 <div class="card"><h2>Plan / progress</h2><div id="steps"></div></div>
@@ -249,8 +250,9 @@ function bars(c,M,k,title,hi){
 let DLV=null;
 async function loadDeliv(){
   if(DLV)return;try{DLV=await (await fetch(q('/files/deliverables.json'))).json();if(!Array.isArray(DLV))throw 0}catch(e){DLV=null;document.getElementById('dlist').textContent='none yet';return}
-  document.getElementById('dlist').innerHTML=DLV.map(d=>`<div class="it"><b>${esc(d.title)}</b><div class="sub">${esc(d.desc||'')}</div><div style="margin-top:6px">${(d.links||[]).map(l=>`<a target=_blank href="${l.local?esc(l.href):q('/files/'+l.href)}">${esc(l.label)}</a>`).join(' · ')}</div>${d.video?`<video controls preload=none src="${q('/files/'+d.video)}"></video>`:''}${d.image?`<a target=_blank href="${q('/files/'+d.image)}"><img style="width:100%;border-radius:6px;margin-top:6px" src="${q('/files/'+d.image)}"></a>`:''}</div>`).join('');
+  document.getElementById('dlist').innerHTML=DLV.map(d=>`<div class="it"><b>${esc(d.title)}</b><div class="sub">${esc(d.desc||'')}</div><div style="margin-top:6px">${(d.links||[]).map(l=>`<a target=_blank href="${l.href==='__VIEWER__'?'/v/'+encodeURIComponent(key)+'/':l.local?esc(l.href):q('/files/'+l.href)}">${esc(l.label)}</a>`).join(' · ')}</div>${d.video?`<video controls preload=none src="${q('/files/'+d.video)}"></video>`:''}${d.image?`<a target=_blank href="${q('/files/'+d.image)}"><img style="width:100%;border-radius:6px;margin-top:6px" src="${q('/files/'+d.image)}"></a>`:''}</div>`).join('');
 }
+document.getElementById('demobtn').href='/v/'+encodeURIComponent(key)+'/';
 showTab(localStorage.getItem('tab')||'ov');
 tick();setInterval(tick,5000);
 </script></body></html>

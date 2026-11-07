@@ -26,6 +26,19 @@
       </label>
     </div>
 
+        <div class="card" id="genCard">
+      <h2>Make a stack from your own photo</h2>
+      <p class="muted small">Pick or take one photo. A cloud GPU runs the diffusion model and returns 9 focus positions (about 1&ndash;3 minutes). <b>Your photo is sent to that server.</b></p>
+      <div class="controls" style="margin-top:8px">
+        <label class="upload">Choose / take photo<input type="file" id="genFile" accept="image/*"></label>
+        <label>Photo is focused on
+          <select id="genPos"><option value="1">something very close</option><option value="4" selected>something at mid distance</option><option value="7">something far away</option></select>
+        </label>
+        <button id="genBtn" type="button" disabled>Generate focal stack</button>
+      </div>
+      <p id="genStatus" class="muted small">Checking GPU server&hellip;</p>
+    </div>
+
     <div class="canvasWrap" id="wrap">
       <canvas id="view" width="640" height="896"></canvas>
       <canvas id="depth" width="640" height="896"></canvas>
@@ -61,7 +74,7 @@
   </aside>
 </main>
 
-<footer>Sharpness is computed in your browser from the frames; nothing is uploaded anywhere. Credit: Tedla, Zhang, Zhang, Xin, <em>Learning to Refocus with Video Diffusion Models</em>, SIGGRAPH Asia 2025.</footer>
+<footer>Sharpness is computed in your browser from the frames; stored stacks and uploads of 9 frames stay on your device; the optional photo generator sends your photo to a cloud GPU server. Credit: Tedla, Zhang, Zhang, Xin, <em>Learning to Refocus with Video Diffusion Models</em>, SIGGRAPH Asia 2025.</footer>
 <script src="app.js"></script>
 </body>
 </html>

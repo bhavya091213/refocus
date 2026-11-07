@@ -1,14 +1,13 @@
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
-\usepackage{amsmath,amssymb,graphicx,booktabs,hyperref,xcolor,enumitem,listings}
+\usepackage{amsmath,amssymb,graphicx,booktabs,hyperref,xcolor,enumitem,listings,tikz,caption,float}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
 \hypersetup{colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black,citecolor=blue!50!black}
 \lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single,columns=fullflexible}
-\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
-\newcommand{\tbd}{\textcolor{red}{\textbf{TBD}}}
 
 \title{Single-Image Refocusing with a Fine-Tuned Video Diffusion Model:\\
 Reproduction and a Controlled Conditioning Ablation}
-\author{Bhavya \\ \textit{Final project, course name \todo{fill in}}}
+\author{Bhavya \\ \textit{Final project}}
 \date{\today}
 
 \begin{document}
@@ -16,12 +15,15 @@ Reproduction and a Controlled Conditioning Ablation}
 
 \begin{abstract}
 Given one photograph with an arbitrary focus setting, we want to produce a \emph{focal stack}---the same scene
-at several focus distances---so that a user can click any pixel and bring it into focus.
+at nine focus distances---so that a user can click any pixel and bring it into focus.
 We follow Tedla et al.~\cite{tedla2025refocus}, who treat a focal stack as a video and fine-tune
 Stable Video Diffusion~\cite{blattmann2023svd} on a smartphone focal-stack dataset.
 We (i) reproduce their pipeline and evaluate their released checkpoint, (ii) fine-tune the same
-model ourselves under a small compute budget, and (iii) run a controlled ablation on how the input image and its focus position are presented to the network.
-On our 20-scene test subset the authors' 200k checkpoint scores PSNR 31.07 and LPIPS 0.160, while our three 4k-step ablation arms reach PSNR 28.6--29.1 with the \texttt{motion\_bucket\_id} variant the weakest.
+model ourselves on a small budget (4{,}000 steps, about \$54 of cloud GPU time), and (iii) run a controlled ablation of how the input photo and its focus position are presented to the network.
+On a fixed 20-scene test subset the authors' 200k-step checkpoint reaches PSNR 31.07 and LPIPS 0.160; our three arms reach PSNR 28.6--29.1.
+Comparing the arms on identical items, the two ``slot-based'' schemes (the authors' \texttt{random} mode and \texttt{ablate\_position}) beat encoding the position through \texttt{motion\_bucket\_id}
+(+0.49\,dB for the best, 55 of 60 items), while \texttt{random} versus \texttt{ablate\_position} is a trade-off between PSNR and SSIM/LPIPS.
+Beyond the reproduction we measure that monocular depth agrees with focus (Spearman $\rho=-0.80$ on real stacks), render ground-truth focal stacks in Blender to probe the released model, and ship a click-to-refocus web viewer with a live photo-to-stack generator.
 \end{abstract}
 
 \section{Problem statement}
@@ -33,6 +35,12 @@ This favours a \emph{generative} model that samples plausible detail over a regr
 \textbf{Task.} Input: one RGB image $I_k$ captured at (known) focal position $k\in\{0,\dots,8\}$.
 Output: a stack $\{\hat I_0,\dots,\hat I_8\}$ of nine images of the same scene, one per focal position.
 \textbf{Interface.} The user clicks pixel $p$; we return the frame $\hat I_{j^\star}$ that is sharpest in a window around $p$ (Section~\ref{sec:ui}).
+
+\section{Related work}
+\textbf{Refocusing and depth of field.} Light-field cameras capture the information needed to refocus after the fact~\cite{ng2005lightfield}; single-image approaches instead estimate depth and re-render blur, as in the portrait-mode pipeline of Wadhwa et al.~\cite{wadhwa2018synthetic}.
+These methods can add blur but cannot remove it. Removing defocus blur from a single image has been studied with dual-pixel sensors~\cite{abuolaim2020defocus}, which again needs special data.
+\textbf{Generative approach.} Latent diffusion~\cite{rombach2022ldm} made high-resolution generative modelling affordable, and video diffusion models such as Stable Video Diffusion~\cite{blattmann2023svd} add temporal layers that keep frames consistent. Tedla et al.~\cite{tedla2025refocus} observe that a focal stack is a video whose ``time'' axis is focus distance and fine-tune SVD on 1{,}637 smartphone focal stacks; this is the work we reproduce.
+\textbf{Why we still ran an ablation.} The paper fixes one way of presenting the input and its focus position to the network; the code also contains alternatives. A short, controlled comparison tells us how much of the behaviour depends on that choice.
 
 \section{Background and model choices}
 \subsection{Why a video model?}
@@ -51,7 +59,28 @@ It is a \emph{latent} diffusion model with three parts, each of which appears in
   \item \textbf{Denoising U-Net} (\texttt{UNetSpatioTemporalConditionModel}): residual convolution blocks and transformer blocks that operate per frame
         (``spatial'' layers) and across frames (``temporal'' layers). \emph{Partly trained} (below).
 \end{itemize}
-\todo{add architecture figure (TikZ) showing VAE / CLIP / U-Net and where the conditioning enters}
+
+\begin{figure}[t]\centering
+\resizebox{\linewidth}{!}{\begin{tikzpicture}[node distance=7mm and 9mm, font=\footnotesize,
+  blk/.style={draw, rounded corners=2pt, minimum height=8mm, align=center, inner sep=3pt},
+  frz/.style={blk, fill=blue!8}, trn/.style={blk, fill=orange!25}, io/.style={blk, fill=gray!10},
+  ar/.style={-{Stealth[length=2mm]}, thick}]
+  \node[io] (img) {input photo $I_k$\\ (position $k$)};
+  \node[frz, right=of img, yshift=7mm] (vae) {VAE encoder\\ (frozen)};
+  \node[frz, right=of img, yshift=-7mm] (clip) {CLIP image\\ encoder (frozen)};
+  \node[blk, right=of vae] (slot) {place latent in\\ slot $k$ of 9,\\ other slots $=0$};
+  \node[blk, right=of slot] (cat) {concat with\\ noisy latent\\ (4+4 = 8 ch)};
+  \node[trn, right=of cat, minimum height=14mm] (unet) {U-Net\\ spatial layers frozen\\ \textbf{temporal blocks trained}};
+  \node[frz, right=of unet] (dec) {VAE decoder\\ (frozen)};
+  \node[io, right=of dec] (out) {9-frame\\ focal stack};
+  \draw[ar] (img) -- (vae); \draw[ar] (img) -- (clip);
+  \draw[ar] (vae) -- (slot); \draw[ar] (slot) -- (cat); \draw[ar] (cat) -- (unet); \draw[ar] (unet) -- (dec); \draw[ar] (dec) -- (out);
+  \draw[ar] (clip) -| node[pos=0.25, below] {cross-attention} (unet.south);
+  \node[blk, above=5mm of cat] (noise) {noise $\sigma\epsilon$\\ on 9 latents};
+  \draw[ar] (noise) -- (cat);
+\end{tikzpicture}}
+\caption{Model overview. Blue = frozen, orange = trained. The slot of the non-zero latent tells the network the input's focus position (arm A; arms B and C copy the latent to all slots, see Section~\ref{sec:ablation}). At inference the noisy latent is denoised for 25 steps and decoded to nine frames.}\label{fig:arch}
+\end{figure}
 
 \subsection{Diffusion objective (EDM parameterisation)}
 SVD uses the EDM framework of Karras et al.~\cite{karras2022edm}. Given clean latents $x_0$ and noise level $\sigma$, the network sees $x_\sigma = x_0 + \sigma\epsilon$.
@@ -85,7 +114,8 @@ drop the image latent or the CLIP embedding to enable classifier-free guidance a
 Only the parameters whose names contain \texttt{temporal\_transformer\_block} are updated; everything else (VAE, CLIP, spatial convolutions, spatial attention) is frozen.
 Rationale: the \emph{spatial} layers already model how a single image looks. What must change is how frames relate to each other, which is exactly the job of the temporal layers.
 This keeps the optimiser state small and limits overfitting on a modest dataset.
-\todo{report exact trainable parameter count / percentage once measured on the GPU}
+
+\textbf{Measured parameter counts.} We loaded the released checkpoint and counted parameters (script run on the cloud machine, CPU only): the U-Net has \textbf{1{,}524.6\,M} parameters, of which \textbf{397.6\,M (26.1\%)} belong to \texttt{temporal\_transformer\_block} modules and are the only ones trained; the CLIP image encoder has 632.1\,M and the VAE 97.7\,M (both frozen), so the whole pipeline has about 2.25\,B parameters. The U-Net's first convolution takes 8 input channels (4 noisy + 4 conditioning), confirming the concatenation scheme. On disk, the authors' checkpoint plus the SVD base parts are about 8.3\,GB.
 
 \begin{table}[h]\centering
 \caption{Training hyperparameters taken from \texttt{configs/focal\_stacks\_train.yaml} (authors' defaults).}
@@ -100,6 +130,7 @@ EMA & off\\
 Checkpoint released by authors & 200{,}000 steps\\
 \bottomrule\end{tabular}
 \end{table}
+\textbf{Paper versus repository defaults.} The paper (Sec.\ 5.1) states a different recipe from the repository's default configuration: ``learning rate of 0.0004'', batch size 4, an EMA with decay $10^{-5}$, 200{,}000 training iterations (it says ``epochs''), and a classifier-free-guidance weight of 1.5 at test time; it does not state the hardware. We could not tell which recipe produced the released checkpoint, so we ran the configuration shipped in the repository ($2\times10^{-5}$ effective learning rate, global batch 2, no EMA). Our learning rate is therefore about $20\times$ smaller than the paper's, which, together with 2\% of the steps, is a likely reason for the gap to the released checkpoint in Section~\ref{sec:results}; we did not test this.
 
 \section{Data and preprocessing}
 \textbf{Dataset.} Tedla et al.\ release smartphone focal stacks with $9$ focal positions per scene, in three variants: raw DNG, full-resolution undistorted, and
@@ -111,7 +142,8 @@ contains 1{,}643 scene folders and 14{,}764 JPEGs, each $640\times896$ (width $\
 Of these, 1{,}638 scenes have all nine focal positions; five folders are incomplete (1, 2, 4, 7 and 8 frames) and belong to no split, so they are never used.
 The split files (\texttt{train\_scenes.pkl}, \texttt{test\_scenes.pkl}) are byte-identical between the repository and the \texttt{splits.zip} on the share:
 \textbf{1{,}474 training scenes and 164 test scenes, with no overlap}, all complete. Scenes are dated across 17 capture days between August and December 2024.
-\todo{capture device, licence of the dataset}
+
+\textbf{Capture device and licence.} According to the paper (Sec.\ 3.1) the data were captured with a custom rig of five iPhones (an iPhone 12 is named in the introduction; the exact model of each phone is not given); each phone records a focal stack by moving the focus from its minimum to maximum distance in nine steps, which in the iPhone API correspond to focus values 0 to 0.8 in steps of 0.1. Only the central camera's stack is used for training. The paper reports 1{,}637 scenes (1{,}474 training, 163 test); the archive we verified contains 1{,}643 scene folders (1{,}638 complete) and a 164-scene test list, so our counts differ from the paper's by one to six scenes, which we did not investigate. We found \emph{no stated licence} for the dataset on the project page, the repository or the paper's abstract page, so we used it only for this coursework, did not redistribute it, and keep it out of our public repository.
 
 \textbf{Preprocessing log (everything we did to the data).}
 \begin{enumerate}[noitemsep]
@@ -129,13 +161,13 @@ The split files (\texttt{train\_scenes.pkl}, \texttt{test\_scenes.pkl}) are byte
   \item Encode every frame with the frozen VAE and multiply by the VAE scaling factor to get latents $x_0\in\mathbb{R}^{9\times4\times112\times80}$.
 \end{enumerate}
 Note that the dataset class resizes with plain \texttt{PIL.resize}; the images are already midsize so this is nearly a no-op.
-\todo{augmentation: none observed in code; confirm}
+We searched \texttt{training/utils.py} and \texttt{training/svd\_runner.py} for flips, crops, colour jitter and similar operations and found none (the dataset class sets \texttt{do\_center\_crop=False}); the only randomness is the shuffling of scenes and the random choice of the input frame $k$ in conditioning mode \texttt{random}. We therefore did no augmentation either.
 
 \section{Experiments}
 \subsection{Evaluation protocol (identical for every model)}
 \textbf{Test subset.} Running the full test set (164 scenes $\times$ 9 input positions $=1{,}476$ generations at about 65\,s each on an A100) would take roughly 26 GPU-hours per model, so we use a fixed subset: every 8th scene of the sorted test list, first 20 scenes, with the \emph{input photo} at positions $\{1,4,7\}$ (near, middle, far). That is 60 generations per model, each producing 9 frames.
-\textbf{Metrics.} For each generation we compare the 8 output frames \emph{other than the input position} (the input frame is copied) with the real photo at the same focus position: PSNR and SSIM (torchmetrics, data range 1), LPIPS (VGG backbone, as in the authors' script). FID and VIF from the authors' script are not reported because 60 generations are too few for a reliable FID. We add one label-free metric from Section~\ref{sec:depth}: the \emph{depth-consistency score}, the Spearman correlation between the sharpest-frame index per pixel and monocular disparity (Depth Anything V2 Small on the real middle frame); more negative is better, and the real stacks score about $-0.80$ on 16 scenes (Section~\ref{sec:depth}).
-\textbf{Uncertainty.} Standard errors over the 480 frame-level scores are reported; they treat frames as independent, which they are not (frames of one generation are correlated), so differences smaller than about two standard errors should not be read as real.
+\textbf{Metrics.} For each generation we compare the 8 output frames \emph{other than the input position} (the input frame is copied) with the real photo at the same focus position: PSNR and SSIM~\cite{wang2004ssim} (torchmetrics, data range 1), LPIPS~\cite{zhang2018lpips} (VGG backbone, as in the authors' script). FID and VIF from the authors' script are not reported because 60 generations are too few for a reliable FID. We add one label-free metric from Section~\ref{sec:depth}: the \emph{depth-consistency score}, the Spearman correlation between the sharpest-frame index per pixel and monocular disparity (Depth Anything V2 Small on the real middle frame); more negative is better, and the real stacks score about $-0.80$ on 16 scenes (Section~\ref{sec:depth}).
+\textbf{Uncertainty.} The evaluation produces 60 items per model (20 scenes $\times$ 3 input positions). We first average each metric over the 8 non-input frames of an item and report the mean and the standard error over the 60 items (the frame-level standard error is about half as large because frames of one generation are strongly correlated, so we do not use it). The three items of one scene share content, so even the item-level error is slightly optimistic. Because every model is evaluated on exactly the same items, we also report \emph{paired} differences, which remove the large scene-to-scene variation; Section~\ref{sec:results} uses both.
 
 \subsection{Baseline: authors' released checkpoint}
 We run the authors' 200{,}000-step checkpoint (\texttt{tedlasai/learn2refocus} on Hugging Face, 15.4\,GB) with the same protocol. It is the reference ceiling: our models see a small fraction of its training.
@@ -144,7 +176,7 @@ We run the authors' 200{,}000-step checkpoint (\texttt{tedlasai/learn2refocus} o
 The training script supports several conditioning modes (\texttt{conditioning:} in the YAML). An \emph{ablation} changes exactly one factor while keeping data, steps, seed and hyperparameters identical, so any quality difference is attributable to that factor. We compare three modes that differ only in how the input photo and its focus position are shown to the network:
 \begin{table}[h]\centering
 \caption{The three arms. Everything else is identical.}
-\begin{tabular}{p{2.6cm}p{9.4cm}}\toprule
+\begin{tabular}{p{3.9cm}p{9.1cm}}\toprule
 Mode & What the network receives\\\midrule
 A: \texttt{random} (paper) & Input latent in slot $k$ of 9, other slots zero; the slot index tells the network the input's focus position.\\
 B: \texttt{ablate\_position} & Input latent copied into \emph{all} 9 slots: no position signal. The network must infer how blurred the input is from the image itself.\\
@@ -155,16 +187,62 @@ We read the inference code (\texttt{svd\_pipeline.py}) to confirm that inference
 \textbf{Training protocol (ours).} Start from the SVD base weights; train only the temporal transformer blocks (Section~3); AdamW, learning rate $10^{-5}\times$ the repository's \texttt{scale\_lr} factor of 2 $=2\times10^{-5}$; per-GPU batch 1 on 2 GPUs with data parallelism (global batch 2); bf16 mixed precision with gradient checkpointing; seed 0; 4{,}000 optimiser steps $=8{,}000$ samples, about 5.4 passes over the 1{,}474 training scenes. The three arms train simultaneously on separate GPU pairs.
 \textbf{Deviations from the authors' training} (stated so the comparison is honest): bf16 and gradient checkpointing (fp32 without checkpointing ran out of memory on a 40\,GB GPU in our test); 4{,}000 steps versus their 200{,}000 (2\%); their hardware and batch size are not stated in the repository; no EMA; their in-training validation was disabled (it crashes under bf16) and we evaluate separately.
 
+\subsection{Results}\label{sec:results}
 \begin{table}[h]\centering
-\caption{Test-subset results (20 scenes $\times$ input positions 1, 4, 7; 8 non-input frames each; mean $\pm$ s.e.). Bold = best of our three arms. Standard errors treat the 60 items as independent, so they are rough.}\label{tab:results}
+\caption{Test-subset results (20 scenes $\times$ input positions 1, 4, 7; mean over the 8 non-input frames of each of the 60 items; $\pm$ = standard error over items). Bold = best of our three arms.}\label{tab:results}
 \begin{tabular}{lcccc}\toprule
 Model & PSNR$\uparrow$ & SSIM$\uparrow$ & LPIPS$\downarrow$ & depth-$\rho$ ($\downarrow$)\\\midrule
-Authors' 200k checkpoint & $31.07\pm0.14$ & $0.893\pm0.003$ & $0.160\pm0.002$ & $-0.70$\\
-A: \texttt{random} (ours, 4k steps) & $28.76\pm0.12$ & $\mathbf{0.870}\pm0.003$ & $\mathbf{0.192}\pm0.002$ & $-0.61$\\
-B: \texttt{ablate\_position} (ours) & $\mathbf{29.11}\pm0.14$ & $0.863\pm0.003$ & $0.196\pm0.002$ & $-0.58$\\
-C: \texttt{ablate\_time} (ours) & $28.62\pm0.14$ & $0.858\pm0.003$ & $0.199\pm0.002$ & $-0.61$\\
+Authors' 200k checkpoint & $31.07\pm0.22$ & $0.893\pm0.004$ & $0.160\pm0.004$ & $-0.70\pm0.04$\\
+A: \texttt{random} (ours, 4k steps) & $28.76\pm0.23$ & $\mathbf{0.870}\pm0.005$ & $\mathbf{0.192}\pm0.004$ & $-0.61\pm0.05$\\
+B: \texttt{ablate\_position} (ours) & $\mathbf{29.11}\pm0.28$ & $0.863\pm0.005$ & $0.196\pm0.005$ & $-0.58\pm0.05$\\
+C: \texttt{ablate\_time} (ours) & $28.62\pm0.29$ & $0.858\pm0.005$ & $0.199\pm0.005$ & $-0.61\pm0.04$\\
 Real stacks (reference) & -- & -- & -- & $-0.76$\\
 \bottomrule\end{tabular}\end{table}
+\begin{figure}[t]\centering\includegraphics[width=\linewidth]{fig_results.pdf}
+\caption{The headline metrics with item-level standard-error bars. The vertical axes are truncated (the start value is printed under each panel), which exaggerates small differences; the large gap to the authors' checkpoint is real, the differences among our three arms are much smaller than the error bars.}\label{fig:results}\end{figure}
+Unpaired, the three arms overlap within about one to two standard errors on every metric, so the table alone would suggest that no conditioning scheme stands out. The authors' checkpoint is clearly better (PSNR $+2.0$ to $+2.5$\,dB, LPIPS $-0.03$ to $-0.04$).
+
+\subsection{Paired comparison of the arms}
+Since all models are scored on the same 60 items, the per-item difference between two models cancels most scene difficulty. Figure~\ref{fig:paired} shows the mean paired difference with a 95\% interval ($\pm1.98$ standard errors of the difference), and Table~\ref{tab:paired} gives the numbers.
+\begin{figure}[t]\centering\includegraphics[width=\linewidth]{fig_paired.pdf}
+\caption{Paired differences between models over the same 60 items, with 95\% intervals. For PSNR and SSIM positive means the first model is better; for LPIPS negative means the first model is better. The three input positions of a scene are not independent, so the intervals are slightly too narrow.}\label{fig:paired}\end{figure}
+\begin{table}[h]\centering
+\caption{Paired differences (first minus second), items where the first model scores higher, and $t=$ mean/s.e.}\label{tab:paired}
+\begin{tabular}{lccc}\toprule
+Comparison & $\Delta$PSNR (dB) & $\Delta$SSIM & $\Delta$LPIPS\\\midrule
+B $-$ C & $+0.49$ (55/60, $t=8.4$) & $+0.005$ ($t=5.7$) & $-0.003$ ($t=-4.9$)\\
+A $-$ C & $+0.14$ (32/60, $t=1.3$) & $+0.013$ (50/60, $t=6.7$) & $-0.008$ ($t=-3.4$)\\
+A $-$ B & $-0.35$ (18/60, $t=-3.0$) & $+0.008$ (44/60, $t=4.3$) & $-0.005$ ($t=-2.2$)\\
+Authors $-$ A & $+2.31$ (58/60, $t=16.3$) & $+0.023$ ($t=10.7$) & $-0.031$ ($t=-20.1$)\\
+\bottomrule\end{tabular}\end{table}
+Reading the table: B beats C on all three metrics and wins 55 of 60 items on PSNR. A beats C on SSIM and LPIPS but not on PSNR. A and B trade places: B has higher PSNR, A has higher SSIM and lower LPIPS. So \texttt{motion\_bucket\_id} (C) is the weakest way to give the position, while A and B are close.
+
+\subsection{Error versus distance from the input}
+Figure~\ref{fig:dist} splits PSNR by the distance between the target position and the input position. For every model the error rises with that distance: arm A falls from 30.0\,dB at distance 1 to 27.7\,dB at distance 7, and the authors' checkpoint from 31.9 to 30.7\,dB. This is what one expects when the model has to hallucinate more blur or more detail the further it moves from what it was given. The curves of our three arms are almost parallel, so no arm is better at ``far'' extrapolation.
+\begin{figure}[t]\centering\includegraphics[width=\linewidth]{fig_dist.pdf}
+\caption{Left: PSNR against the distance between target and input positions. Right: PSNR by target position (inputs 1, 4 and 7 pooled; target positions equal to an input position have fewer samples).}\label{fig:dist}\end{figure}
+
+\subsection{Training loss}
+Figure~\ref{fig:loss} shows the logged loss. It is the mean squared error of one randomly noised sample per step, so single values are very noisy and the large swings (about 0.07 to 0.28) reflect which noise levels and scenes were drawn, not instability. The three arms nearly coincide because they all use seed 0 and therefore see the same scenes and noise levels at each step; as a result the loss is \emph{not} a measure of quality and cannot separate the arms, which is why we compare them on held-out metrics. All arms end near 0.07.
+\begin{figure}[t]\centering\includegraphics[width=\linewidth]{fig_loss.pdf}
+\caption{Training loss of the three arms (logged every 20 steps). Left: 15-point moving average. Right: mean in 1000-step blocks.}\label{fig:loss}\end{figure}
+
+\subsection{Qualitative comparison}
+Figure~\ref{fig:qual} shows one test scene with the input at position 4. At this size (180$\times$252 px per frame in our saved evaluation sheets) the models' outputs look close to the real stack: the global appearance and the gradual change of sharpness are preserved, and differences between arms are not visible by eye, which agrees with the small metric differences. We did not save full-resolution generations for all 240 items, so a more careful qualitative study is left out.
+\begin{figure}[t]\centering\includegraphics[width=\linewidth]{fig_qual.pdf}
+\caption{Real stack (top) and the models' generated stacks (input photo at position 4) for one test scene.}\label{fig:qual}\end{figure}
+
+\subsection{PSNR by input position}
+\begin{table}[h]\centering
+\caption{PSNR (dB) by input position (mean over 20 scenes $\times$ 8 target frames).}
+\begin{tabular}{lccc}\toprule
+Model & input 1 & input 4 & input 7\\\midrule
+Authors' 200k & 30.69 & 31.46 & 31.05\\
+A: \texttt{random} & 28.28 & 29.11 & 28.89\\
+B: \texttt{ablate\_position} & 28.65 & 29.41 & 29.25\\
+C: \texttt{ablate\_time} & 28.20 & 28.93 & 28.72\\
+\bottomrule\end{tabular}\end{table}
+A middle input (position 4) is easiest for every model, which is natural because it is on average closest to the other eight positions.
 
 \subsection{Pipeline check}
 Before training we ran the full evaluation on the authors' checkpoint with 2 scenes $\times$ 3 positions (6 generations) as a smoke test: PSNR 32.7, SSIM 0.934, LPIPS 0.195, depth-consistency $-0.21$ (real stacks of those 2 scenes: $-0.52$). With so few scenes these numbers only show that the pipeline works.
@@ -195,15 +273,30 @@ Input position & Object & GT peak & Model peak & Shift & Curve corr.\\\midrule
 \bottomrule\end{tabular}\end{table}
 With the input at position 4 the model's apple, bust and cat sharpen in the right order but consistently one position late (Figure~\ref{fig:macro}). With the input at position 6 the peaks fall \emph{early} and are no longer in depth order. So the macro-scale assumption did \textbf{not} remove the offset, and the offset changes sign with the input position: the model's behaviour on synthetic scenes is not a fixed calibration error that a different distance mapping would fix.
 \begin{figure}[h]\centering\includegraphics[width=\linewidth]{compare_macro_in4.jpg}
-\caption{Macro scene, input at position 4. Top: ground-truth stack (Blender). Middle: authors' model output from the single input photo (bottom, position 4).}\label{fig:macro}\end{figure}
+\caption{Macro scene, input at position 4. Top: ground-truth stack rendered in Blender. Middle: the authors' model's stack generated from the single input photo shown at the bottom (position 4).}\label{fig:macro}\end{figure}
 
 \textbf{Takeaway.} On synthetic scenes the released model produces a plausible near-to-far focus sweep but with a position error of one to three steps, and that error depends on the input position. We cannot separate a wrong distance-to-position assumption from the synthetic-to-real domain shift with this data; doing so would need real photos with known focus distances. For the live demo we therefore treat the Blender result as an illustration, not a benchmark.
 
-\section{Click-to-refocus interface}\label{sec:ui}
-Given the generated stack, define a local sharpness for frame $j$ at pixel $p$, e.g.\ the variance of the Laplacian in a window $W_p$:
-$s_j(p)=\mathrm{Var}_{q\in W_p}[\nabla^2 \hat I_j(q)]$. Clicking $p$ displays $\hat I_{j^\star}$ with $j^\star=\arg\max_j s_j(p)$.
-\todo{implement, show screenshots, discuss failure on textureless regions}
+\section{Click-to-refocus interface and demo system}\label{sec:ui}
+\textbf{Selecting the frame.} Given a generated stack, define the local sharpness of frame $j$ around pixel $p$ as the variance of the Laplacian in a window $W_p$: $s_j(p)=\mathrm{Var}_{q\in W_p}[\nabla^2 \hat I_j(q)]$. Clicking $p$ displays $\hat I_{j^\star}$ with $j^\star=\arg\max_j s_j(p)$.
+We implemented this in a dependency-free web page (HTML/JavaScript, \texttt{viewer/}); all sharpness computation happens in the browser on a downsampled grayscale copy of the frames (width at most 256\,px), using integral images of the Laplacian and its square so that the window statistics of any click are computed in constant time. The page cross-fades between frames, shows a position slider and a strip of the nine frames, plots $s_j(p)$ for the clicked point, and can colour every coarse cell by its sharpest frame (a ``depth-like map'').
+Figure~\ref{fig:ui} shows the viewer on our Blender macro scene, where by construction the duck, apple, bust and cat are sharpest at positions 4, 5, 6 and 7: clicks on the duck and on the cat select positions 4 and 7, and clicks on the apple and the bust (not shown) select 5 and 6.
+\begin{figure}[t]\centering\includegraphics[width=\linewidth]{fig_ui.png}
+\caption{The click-to-refocus viewer on the Blender macro stack. Left to right: click on the duck (position 4); click on the cat (position 7); the depth-like map (cool colours = sharpest at far positions; grey = too little texture); a click on the flat floor, where the viewer warns that the choice is unreliable.}\label{fig:ui}\end{figure}
+\textbf{Failure case: textureless regions.} Where an area has no texture (a plain table, a wall, the sky) all nine frames have nearly the same Laplacian variance, so the argmax is dominated by noise. The viewer detects this by comparing the maximum and minimum sharpness across the nine frames and shows a ``low-texture spot, choice unreliable'' warning instead of presenting the choice as confident (right panel of Figure~\ref{fig:ui}); the depth-like map leaves such cells grey. A better rule would propagate the decision from nearby textured pixels of the same object, which we did not implement. The same weakness limits our depth-consistency metric, which is why that metric only uses the 40\% most textured pixels.
 
+\textbf{Photo-to-stack generator.} The page also lets the user take or choose a photo and generate a stack with the model (Figure~\ref{fig:system}). The browser downsizes the photo to at most 1600\,px and sends it to our dashboard server, which forwards it over an SSH tunnel to a small HTTP server on a rented 24\,GB A10 GPU. That server keeps the model loaded and handles one request at a time. To fit 24\,GB we keep the weights in fp32 but run the forward pass under bf16 autocast and decode the video latents two frames at a time; this uses about 19\,GB, and one $576\times832$ photo takes about 48\,s. The image is resized so that it has at most 500{,}000 pixels, as in the authors' code, and the user states whether the photo is focused near (position 1), mid (4) or far (7), which selects the input slot. We checked the whole chain end to end on a rendered Blender photo, where it produced a plausible near-to-far sweep (the cat and bust sharpen towards the far positions); we did not evaluate its quality beyond that, and the numbers in Table~\ref{tab:results} come from the full-precision authors' pipeline, not from this reduced-memory one.
+\begin{figure}[t]\centering
+\resizebox{\linewidth}{!}{\begin{tikzpicture}[node distance=8mm, font=\footnotesize, blk/.style={draw, rounded corners=2pt, minimum height=8mm, align=center, inner sep=3pt}, ar/.style={-{Stealth[length=2mm]}, thick}]
+  \node[blk] (ph) {phone / browser\\ (viewer page)};
+  \node[blk, right=12mm of ph] (dash) {dashboard server\\ (this PC, behind a\\ Cloudflare tunnel)};
+  \node[blk, right=12mm of dash] (gpu) {GPU server\\ (A10, SSH tunnel)\\ model stays loaded};
+  \draw[ar] (ph) -- node[above]{photo} (dash); \draw[ar] (dash) -- node[above]{job} (gpu);
+  \draw[ar] (gpu.south) -- ++(0,-6mm) -| node[pos=0.25, below]{9 frames} (dash.south);
+  \draw[ar] (dash.north) -- ++(0,6mm) -| node[pos=0.25, above]{poll, then show} (ph.north);
+\end{tikzpicture}}
+\caption{System behind the photo-to-stack demo. The GPU machine is only switched on while testing; when it is off, the page says so.}\label{fig:system}\end{figure}
+Privacy: the generator sends the user's photo to a cloud GPU, which the page states; uploads of ready-made nine-frame stacks are processed entirely in the browser.
 
 \section{Extra credit: depth and focus (exploration)}\label{sec:depth}
 \textbf{Idea.} In a focal stack, the frame that is sharpest at a pixel is a proxy for that pixel's depth (depth from focus). If so, a monocular depth estimator should \emph{agree} with the focal stack, and depth could be used to evaluate, calibrate, or condition a refocusing model.
@@ -227,19 +320,25 @@ $s_j(p)=\mathrm{Var}_{q\in W_p}[\nabla^2 \hat I_j(q)]$. Clicking $p$ displays $\
 \end{itemize}
 The depth-consistency score is similar for all arms ($-0.58$ to $-0.61$) and below the authors' $-0.70$; real stacks reach $-0.76$. Error also grows with the distance between the input position and the target position: for arm A, PSNR falls from 30.0\,dB at distance 1 to 27.7\,dB at distance 7, and the authors' checkpoint shows the same trend (31.9 to 30.7).
 
-\textbf{What we can and cannot say.} Knowing the position matters less than \emph{how} it is given: the slot-based schemes (A and B) both beat the \texttt{motion\_bucket\_id} scheme (C). Whether the model should be told the position at all (A vs.\ B) is a perceptual-versus-pixel trade-off that we cannot settle: B favours PSNR, A favours SSIM and LPIPS. These are single-seed results at 4{,}000 steps on 20 scenes, so a ranking could change with longer training or other seeds.
+\textbf{What the comparison says.} Knowing the position matters less than \emph{how} it is given: the slot-based schemes (A and B) both beat the \texttt{motion\_bucket\_id} scheme (C). Whether the model should be told the position at all (A vs.\ B) is a perceptual-versus-pixel trade-off that we cannot settle: B favours PSNR, A favours SSIM and LPIPS. These are single-seed results at 4{,}000 steps on 20 scenes, so a ranking could change with longer training or other seeds.
 
-\textbf{Other limitations.} Evaluation covers 20 scenes and three input positions; no FID or VIF; the position-to-distance mapping for the Blender demo is our assumption; we did not keep the 25\,GB trained checkpoints (the instance was terminated), so the live demo uses the authors' released weights.
+\textbf{Other limitations.} Evaluation covers 20 scenes and three input positions; no FID or VIF; one seed per arm; the position-to-distance mapping for the Blender demo is our assumption; the learning rate we used is the repository's, not the paper's (Section~3); and the photo generator runs in reduced precision, which we did not quantify. The licence of the dataset is not stated, so we do not redistribute it.
 
 \section{Conclusion}
 We rebuilt the refocusing pipeline of Tedla et al.\ on a short budget (about \$54, 3.4 hours on 8 A100s) and compared three ways of telling the model the input's focus position. At 4{,}000 steps the slot-based schemes (\texttt{random}, \texttt{ablate\_position}) beat the \texttt{motion\_bucket\_id} scheme, while \texttt{random} vs.\ \texttt{ablate\_position} is a PSNR-versus-SSIM/LPIPS trade-off, and all three trail the authors' 200k-step checkpoint by about 2--2.5\,dB PSNR. Separately, a depth-from-focus check (Spearman $-0.80$ on real stacks) supports using monocular depth as a label-free consistency score, and our Blender experiments show the released model produces a plausible near-to-far sweep with position errors of one to three steps.
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{99}
 \bibitem{tedla2025refocus} S.~Tedla, Z.~Zhang, X.~Zhang, S.~Xin. \emph{Learning to Refocus with Video Diffusion Models}. ACM SIGGRAPH Asia, 2025.
   \url{https://learn2refocus.github.io/}; code: \url{https://github.com/tedlasai/learn2refocus}.
 \bibitem{blattmann2023svd} A.~Blattmann et al. \emph{Stable Video Diffusion: Scaling Latent Video Diffusion Models to Large Datasets}. arXiv:2311.15127, 2023.
 \bibitem{karras2022edm} T.~Karras, M.~Aittala, T.~Aila, S.~Laine. \emph{Elucidating the Design Space of Diffusion-Based Generative Models}. NeurIPS, 2022.
 \bibitem{yang2024depthanythingv2} L.~Yang et al. \emph{Depth Anything V2}. NeurIPS, 2024. arXiv:2406.09414.
 \bibitem{silberman2012nyu} N.~Silberman, D.~Hoiem, P.~Kohli, R.~Fergus. \emph{Indoor Segmentation and Support Inference from RGBD Images}. ECCV, 2012. \url{https://cs.nyu.edu/~fergus/datasets/nyu_depth_v2.html}.
+\bibitem{ng2005lightfield} R.~Ng, M.~Levoy, M.~Br\'edif, G.~Duval, M.~Horowitz, P.~Hanrahan. \emph{Light Field Photography with a Hand-held Plenoptic Camera}. Stanford Tech Report CTSR 2005-02, 2005.
+\bibitem{wadhwa2018synthetic} N.~Wadhwa et al. \emph{Synthetic Depth-of-Field with a Single-Camera Mobile Phone}. ACM Transactions on Graphics (SIGGRAPH), 2018.
+\bibitem{abuolaim2020defocus} A.~Abuolaim, M.~S.~Brown. \emph{Defocus Deblurring Using Dual-Pixel Data}. ECCV, 2020.
+\bibitem{rombach2022ldm} R.~Rombach, A.~Blattmann, D.~Lorenz, P.~Esser, B.~Ommer. \emph{High-Resolution Image Synthesis with Latent Diffusion Models}. CVPR, 2022.
+\bibitem{zhang2018lpips} R.~Zhang, P.~Isola, A.~Efros, E.~Shechtman, O.~Wang. \emph{The Unreasonable Effectiveness of Deep Features as a Perceptual Metric}. CVPR, 2018.
+\bibitem{wang2004ssim} Z.~Wang, A.~Bovik, H.~Sheikh, E.~Simoncelli. \emph{Image Quality Assessment: From Error Visibility to Structural Similarity}. IEEE TIP, 2004.
 \end{thebibliography}
 \end{document}

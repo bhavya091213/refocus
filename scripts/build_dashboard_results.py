@@ -18,6 +18,9 @@ out = {"models": [], "paired": [], "by_frame": {}, "by_dist": {}, "scenes": [], 
 for k, m in M.items():
     s = m["summary"]; out["models"].append(dict(key=k, name=NAMES[k], **{q: s[q] for q in keys}, **{q + "_se": s[q + "_se"] for q in keys},
         rho=s["depth_consistency_rho"], gt_rho=s["gt_depth_consistency_rho"], psnr_by_pos=s["psnr_by_pos"], ssim_by_pos=s["ssim_by_pos"], lpips_by_pos=s["lpips_by_pos"]))
+    for q in keys:   # item-level standard errors (60 items), larger and more honest than the frame-level ones in metrics.json
+        vals = np.array(list(IM[k][q].values())); out["models"][-1][q + "_se"] = float(vals.std(ddof=1) / math.sqrt(len(vals)))
+    rr = np.array([it["rho"] for it in m["items"]]); out["models"][-1]["rho_se"] = float(rr.std(ddof=1) / math.sqrt(len(rr)))
     pf = np.zeros(9); cnt = np.zeros(9); dd = {}
     for it in m["items"]:
         for f in it["frames"]:
