@@ -27,6 +27,8 @@ def per_item(path: str) -> dict[tuple[str, int], dict[str, float]]:
 
 def mean_se(values: list[float]) -> tuple[float, float]:
     n = len(values)
+    if n < 2:
+        sys.exit("need at least 2 items to compute a standard error (found %d)" % n)
     mean = sum(values) / n
     var = sum((v - mean) ** 2 for v in values) / (n - 1)
     return mean, math.sqrt(var / n)

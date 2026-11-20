@@ -22,8 +22,11 @@ st "EVAL START $NAME (20 scenes x positions 1,4,7, GPU $GPU)"
 CUDA_VISIBLE_DEVICES=$GPU REFOCUS_EVAL_SCENES=20 REFOCUS_EVAL_POS=1,4,7 accelerate launch --num_processes 1 --mixed_precision no \
     --main_process_port 29600 training/svd_runner.py --config "training/configs/eval_$NAME.yaml" > ~/eval_"$NAME".log 2>&1
 CUDA_VISIBLE_DEVICES=$GPU python ~/eval_metrics.py "$NAME" 20 1,4,7 > ~/metrics_"$NAME".log 2>&1
-if grep -q EVAL_METRICS_DONE ~/metrics_"$NAME".log; then
-  st "EVAL DONE $NAME: $(python -c "import json;s=json.load(open('outputs/eval_$NAME/metrics.json'))['summary'];print('PSNR',s['psnr'],'SSIM',s['ssim'],'LPIPS',s['lpips'],'depth-rho',s['depth_consistency_rho'],'items',s['n_items'])")"
+SUMMARY=$(python -c "import json;s=json.load(open('outputs/eval_$NAME/metrics.json'))['summary'];print('PSNR',s['psnr'],'SSIM',s['ssim'],'LPIPS',s['lpips'],'depth-rho',s['depth_consistency_rho'],'items',s['n_items'])" 2>/dev/null)
+if grep -q EVAL_METRICS_DONE ~/metrics_"$NAME".log && [ -n "$SUMMARY" ]; then
+  # keep a second copy of the small result files in ~ so they are quick to fetch before the instance goes away
+  cp "outputs/eval_$NAME/metrics.json" ~/metrics_"$NAME".json
+  st "EVAL DONE $NAME: $SUMMARY"
 else
   st "EVAL FAILED $NAME (see ~/eval_$NAME.log ~/metrics_$NAME.log)"
 fi

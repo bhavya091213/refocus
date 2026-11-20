@@ -13,7 +13,7 @@ Class final project (user: **Bhavya**, Windows account "Raj"). Goal: one photo -
 | Dashboard (tabs: Overview, Results, Training, Cloud & hardware, Deliverables, Log) | `dashboard/server.py` + `index.html`, port 8791, Cloudflare quick tunnel | running on the PC |
 | Results / ablation | `results/eval_*/metrics.json`, `scripts/build_dashboard_results.py` | done |
 
-Dashboard: `https://demand-rising-tons-facts.trycloudflare.com/?key=<token in dashboard/token.txt>` (the quick-tunnel URL changes if cloudflared restarts: read `logs/tunnel.log`). Phone demo: `/v/<token>/` on the same host.
+Dashboard: `<the quick-tunnel URL>/?key=<dashboard token, kept outside the repo>` (the quick-tunnel URL changes if cloudflared restarts: read `logs/tunnel.log`). Phone demo: `/v/<token>/` on the same host.
 
 ## Key results (20 held-out scenes x input positions 1,4,7 = 60 items per model; 4,000 training steps per arm)
 Authors 200k: PSNR 31.07 / SSIM .893 / LPIPS .160 / depth-rho -0.70. A random 28.76/.870/.192/-0.61; B ablate_position 29.11/.863/.196/-0.58; C ablate_time 28.62/.858/.199/-0.61 (real stacks rho -0.76).
@@ -21,7 +21,7 @@ Paired (same items): B>C on all metrics (+0.49 dB, 55/60); A>C on SSIM/LPIPS; A 
 Paper vs repo recipe: paper Sec. 5.1 says lr 4e-4, batch 4, EMA 1e-5, 200k iterations; repo defaults (what we ran) are lr 1e-5 x scale_lr, batch 1, no EMA. Mentioned in the report.
 Measured params: U-Net 1,524.6 M, of which 397.6 M (26.1 %) temporal blocks trained; CLIP 632 M; VAE 97.7 M.
 
-## Money (Lambda Cloud, key in `secrets/lambda.key`, gitignored; never print it)
+## Money (Lambda Cloud, API key kept outside the repo; never print it)
 - Spent: 8xA100 ablation $53.93 (3.39 h). A10 inference test ~1 h (~$1.5, terminated). A100 re-run in progress ($1.99/h, budget cap $20 via watchdog). Total project cap was $100.
 - **Instance 12e2860b24724abaa0e5f975ecf38d0c** (1xA100, us-west-2, IP in `logs/new_ip.txt`) is **training arm A again** (`scripts/run_single_arm.sh`: 1 GPU x grad-accum 2, 4,000 steps, seed 0, then eval on the same 20x3 items). Started 00:54 UTC; ETA training ~04:40 UTC, eval ~05:55 UTC. Pipeline log on the box: `~/pipeline.log`; per-run logs `~/train_armA_rerun.log`.
 - **Unattended finisher already running on the PC:** `scripts/finish_rerun.sh` (log `logs/finish_rerun.log`). When the pipeline logs ALL DONE it pulls `checkpoint-4000/unet` + `metrics.json` + sheets + train log into `checkpoints/armA_rerun/` (gitignored, ~6 GB), writes `PULLED_OK`, then terminates the instance. If it failed/pull is incomplete the instance is left for the watchdogs. `scripts/watchdog.py` (log `logs/watchdog.log`) kills the instance at `logs/deadline.txt` (~07:40 UTC) or $20.
@@ -54,7 +54,7 @@ Local PC (AMD RX 6900 XT 16 GB, 32 GB RAM, no CUDA) generation was being explore
 - **Parameter counts:** `scripts/count_params.py` builds the models from their configs (no weights) and writes `slides/arch_params.json`; totals match the checkpoint counts already in the report.
 - **Demo:** `scripts/make_demo_gif.py` drives the real viewer with Playwright + Chrome and records `slides/demo.gif`; `scripts/build_demo.py` wraps it and writes the stills and `slides/demo/demo.json` that slide 3 and the notes read. Run with a Python that has `playwright` and `pillow`, plus ffmpeg on PATH.
 - **Arm A retrain (2x H100, Lambda, 55 min):** same recipe as arm A, gradient checkpointing off. Scripts: `scripts/remote_bootstrap.sh`, `retrain_armA_2gpu.sh`, `retrain_chain.sh`, `infer_stacks.py`, `eval_retrain.sh`, `retrain_summary.py`. Log: `results/train_armA_retrain.log`. Evaluation means on the usual 20x3 items: PSNR 28.48, SSIM 0.865, LPIPS 0.1975, depth-rho -0.58 (original arm A: 28.76 / 0.870 / 0.192 / -0.61). **The per-item `metrics.json` was lost** (instance terminated before it was downloaded), so there are no standard errors or paired statistics for the retrain.
-- **Weights:** `checkpoints/armA_retrain/unet/` on the Mac (gitignored, 6.1 GB, sha256 `cdab084a...544ece`). Remote copy: release `armA-retrain-2026-11-20` of the private repo `bhavya091213/refocus-weights` (three parts + `reassemble.sh`).
+- **Weights:** `checkpoints/armA_retrain/unet/` on the Mac (gitignored, 6.1 GB, sha256 `cdab084a...544ece`). Remote copies: the private Hugging Face model repo `bhavya091213/refocus-armA-retrain` (`unet/` folder), and release `armA-retrain-2026-11-20` of the private GitHub repo `bhavya091213/refocus-weights` (three parts + `reassemble.sh`).
 - **Viewer:** new full-size stack `ours_armA_chess` (retrained arm A, input position 4).
 - **Report:** `report/main.tex` rewritten (23 pages): architecture section with flowchart and per-block table, notation table, retrain subsection, corrected depth numbers (-0.76 on the 20 evaluation scenes vs -0.80 in the 16-scene exploration) and Blender wording. Compile with `cd report && latexmk -pdf main.tex`; `main.pdf` and the `fig_*.pdf` figures are now tracked.
 

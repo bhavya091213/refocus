@@ -15,6 +15,7 @@ grep -q "BOOTSTRAP DONE" ~/STATUS || { st "CHAIN STOPPED: bootstrap failed"; exi
 cd ~/refocus/learn2refocus && . ../venv/bin/activate || exit 1
 cp ~/infer_stacks.py .
 mapfile -t SCENES < ~/candidates.txt
+[ "${#SCENES[@]}" -ge 2 ] || { st "CHAIN STOPPED: ~/candidates.txt needs at least 2 scene names"; exit 1; }
 
 # 1. inference test (base weights, so the output itself is meaningless; we only check the path works)
 if CUDA_VISIBLE_DEVICES=0 python infer_stacks.py ./svdh/unet outputs/infer_test 4 "$(scene_dir "${SCENES[0]}")" > ~/infer_test.log 2>&1; then
@@ -23,7 +24,8 @@ else
   st "INFER TEST FAILED (see ~/infer_test.log); continuing with training"
 fi
 
-# 2. smoke test without gradient checkpointing
+# 2. smoke test without gradient checkpointing (it writes no checkpoint, so its own script logs
+#    "TRAIN FAILED smoke"; that line is expected and the SMOKE line below is the real result)
 nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits -l 2 > ~/smoke_mem.log 2>/dev/null &
 MEMPID=$!
 STEPS=30 NAME=smoke CK=100000 GC=false bash ~/retrain_armA_2gpu.sh > /dev/null 2>&1

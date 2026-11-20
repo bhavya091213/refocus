@@ -32,6 +32,5 @@ st "dataset extracted: $(ls -d data/*/ | wc -l) scene folders"
 
 python ~/remote_patch.py > ~/patch.log 2>&1 || fail "patches (see ~/patch.log)"
 st "patches: $(tr '\n' ' ' < ~/patch.log)"
-nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | tr '\n' ';' | sed 's/^/gpus: /' | tee -a ~/STATUS
-echo
+st "gpus: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | tr '\n' ';')"
 st "BOOTSTRAP DONE"
