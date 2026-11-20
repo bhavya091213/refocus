@@ -4,7 +4,6 @@ data/
 runs/
 tools/
 logs/
-slides/*.pptx
 *.pt
 *.safetensors
 *.ckpt
@@ -19,6 +18,9 @@ dashboard/public/
 
 # LaTeX build output
 report/*.pdf
+# ...except the deliverable and the figures it needs, so the paper is in the repo and compiles as cloned
+!report/main.pdf
+!report/fig_*.pdf
 report/*.aux
 report/*.log
 report/*.out
@@ -46,3 +48,8 @@ local_infer/
 logs/
 *.safetensors
 checkpoints/
+.lambda-run/
+slides/demo_frames/
+report/*.fdb_latexmk
+report/*.toc
+.DS_Store

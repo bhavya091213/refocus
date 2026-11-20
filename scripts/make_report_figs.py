@@ -4,8 +4,12 @@ import numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from PIL import Image
-R = "D:/Refocus/"; O = R + "report/"
-S = json.load(open(R + "dashboard/public/results/summary.json"))
+R = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/"; O = R + "report/"
+# summary.json (from scripts/build_dashboard_results.py) and the loss log are dashboard build outputs,
+# not kept in the repo; point these two variables elsewhere if they were built outside dashboard/.
+SUMMARY = os.environ.get("REFOCUS_SUMMARY", R + "dashboard/public/results/summary.json")
+LOSS_LOG = os.environ.get("REFOCUS_LOSS_LOG", R + "dashboard/metrics.jsonl")
+S = json.load(open(SUMMARY))
 COL = {"authors200k": "#6b7280", "armA_random": "#2563eb", "armB_ablate_position": "#d97706", "armC_ablate_time": "#059669"}
 SHORT = {"authors200k": "Authors'\n200k", "armA_random": "A\nrandom", "armB_ablate_position": "B\nablate_position", "armC_ablate_time": "C\nablate_time"}
 LONG = {"authors200k": "Authors' 200k checkpoint", "armA_random": "A: random (ours, 4k)", "armB_ablate_position": "B: ablate_position (ours, 4k)", "armC_ablate_time": "C: ablate_time (ours, 4k)"}
@@ -45,7 +49,7 @@ for ax in axs: ax.grid(alpha=0.25)
 plt.tight_layout(); plt.savefig(O + "fig_dist.pdf"); plt.close()
 
 # ---- 4. training loss
-rows = [json.loads(l) for l in open(R + "dashboard/metrics.jsonl") if l.strip()]
+rows = [json.loads(l) for l in open(LOSS_LOG) if l.strip()]
 runs = {}
 for r in rows:
     if r.get("loss") is not None and r.get("run"): runs.setdefault(r["run"], []).append((r["step"], r["loss"]))

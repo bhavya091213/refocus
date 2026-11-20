@@ -44,3 +44,24 @@ Local PC (AMD RX 6900 XT 16 GB, 32 GB RAM, no CUDA) generation was being explore
 - PawnIO driver for CPU temperatures on the dashboard NOT installed (needs user approval).
 - Dataset licence is not stated; do not redistribute (data/ is gitignored).
 - Background processes on the PC (keep running): dashboard server (8791), cloudflared tunnel, cloud_monitor.py, watchdog.py, finish_rerun.sh, sys_monitor. Stop them with Task Manager / `taskkill` when the project is over.
+
+---
+
+# Update 2026-11-20 (written on the Mac; the repo was cloned fresh to ~/refocus)
+
+## What changed
+- **Deck:** rebuilt as `slides/44_Bhavya_Patel.pptx` (submission name) from `slides/build.js` + `theme.js`, `slide1.js` (problem, how we trained, Blender), `slide2.js` (architecture flowchart with per-block parameter counts, citation, abbreviations key), `slide3.js` (demo only), `notes.js` (speaker script). Build: `cd slides && npm install && node build.js`. Arial throughout, so it looks the same in PowerPoint, Keynote and Google Slides. `slides/refocus_slides.pdf` is an image export of the same three slides.
+- **Parameter counts:** `scripts/count_params.py` builds the models from their configs (no weights) and writes `slides/arch_params.json`; totals match the checkpoint counts already in the report.
+- **Demo:** `scripts/make_demo_gif.py` drives the real viewer with Playwright + Chrome and records `slides/demo.gif`; `scripts/build_demo.py` wraps it and writes the stills and `slides/demo/demo.json` that slide 3 and the notes read. Run with a Python that has `playwright` and `pillow`, plus ffmpeg on PATH.
+- **Arm A retrain (2x H100, Lambda, 55 min):** same recipe as arm A, gradient checkpointing off. Scripts: `scripts/remote_bootstrap.sh`, `retrain_armA_2gpu.sh`, `retrain_chain.sh`, `infer_stacks.py`, `eval_retrain.sh`, `retrain_summary.py`. Log: `results/train_armA_retrain.log`. Evaluation means on the usual 20x3 items: PSNR 28.48, SSIM 0.865, LPIPS 0.1975, depth-rho -0.58 (original arm A: 28.76 / 0.870 / 0.192 / -0.61). **The per-item `metrics.json` was lost** (instance terminated before it was downloaded), so there are no standard errors or paired statistics for the retrain.
+- **Weights:** `checkpoints/armA_retrain/unet/` on the Mac (gitignored, 6.1 GB, sha256 `cdab084a...544ece`). Remote copy: release `armA-retrain-2026-11-20` of the private repo `bhavya091213/refocus-weights` (three parts + `reassemble.sh`).
+- **Viewer:** new full-size stack `ours_armA_chess` (retrained arm A, input position 4).
+- **Report:** `report/main.tex` rewritten (23 pages): architecture section with flowchart and per-block table, notation table, retrain subsection, corrected depth numbers (-0.76 on the 20 evaluation scenes vs -0.80 in the 16-scene exploration) and Blender wording. Compile with `cd report && latexmk -pdf main.tex`; `main.pdf` and the `fig_*.pdf` figures are now tracked.
+
+## Money
+- The 2x H100 instance cost about $30.2 (3.15 h at $9.58/h). The work was done after 1.7 h; the rest was idle because the Mac running the session and the watchdog went to sleep. Zero instances remain on the account. Next time put the cost watchdog on the instance itself.
+- No credentials are stored in this repository; the Lambda API key and SSH key stay on the Mac.
+
+## Open
+- Re-running the 20x3 evaluation of the retrained weights (about 1 h on one A100) would recover the standard errors and allow the paired comparison with the original arm A.
+- The results table is no longer in the deck (slide 3 is the demo); the numbers are in the report and in the slide 3 speaker note.
