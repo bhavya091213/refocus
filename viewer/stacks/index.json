@@ -85,6 +85,23 @@
   ]
  },
  {
+  "name": "ours_armA_chess",
+  "title": "Our model A (retrained), full size, input position 4",
+  "source": "model",
+  "note": "Our arm A retrained for 4,000 steps on 2026-11-20; all nine 640x896 frames generated from ONE input frame (position 4) of a test scene.",
+  "frames": [
+   "stacks/ours_armA_chess/frame_0.jpg",
+   "stacks/ours_armA_chess/frame_1.jpg",
+   "stacks/ours_armA_chess/frame_2.jpg",
+   "stacks/ours_armA_chess/frame_3.jpg",
+   "stacks/ours_armA_chess/frame_4.jpg",
+   "stacks/ours_armA_chess/frame_5.jpg",
+   "stacks/ours_armA_chess/frame_6.jpg",
+   "stacks/ours_armA_chess/frame_7.jpg",
+   "stacks/ours_armA_chess/frame_8.jpg"
+  ]
+ },
+ {
   "name": "blender_macro",
   "title": "Blender macro scene (ground truth)",
   "source": "blender",

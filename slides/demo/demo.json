@@ -1,0 +1,27 @@
+{
+ "stack": "ours_armA_chess",
+ "input_pos": 4,
+ "model": "our fine-tuned model (variant A, 4,000 training steps)",
+ "clicks": [
+  {
+   "x": 0.1,
+   "y": 0.7,
+   "frame": 2,
+   "label": "the near black rook",
+   "before": "click_1_before.jpg",
+   "after": "click_1_after.jpg"
+  },
+  {
+   "x": 0.63,
+   "y": 0.17,
+   "frame": 6,
+   "label": "the far white piece",
+   "before": "click_2_before.jpg",
+   "after": "click_2_after.jpg"
+  }
+ ],
+ "frame_size": [
+  640,
+  896
+ ]
+}

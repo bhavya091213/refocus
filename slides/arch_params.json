@@ -1,0 +1,621 @@
+{
+  "rules": {
+    "trainable_filter": "temporal_transformer_block",
+    "categories": [
+      [
+        "temporal_transformer",
+        "temporal_transformer_block"
+      ],
+      [
+        "spatial_transformer",
+        ".transformer_blocks."
+      ],
+      [
+        "spatial_resnet",
+        ".spatial_res_block."
+      ],
+      [
+        "temporal_resnet",
+        ".temporal_res_block."
+      ],
+      [
+        "sampler_conv",
+        ".downsamplers."
+      ],
+      [
+        "sampler_conv",
+        ".upsamplers."
+      ]
+    ]
+  },
+  "unet": {
+    "total": 1524623082,
+    "trainable_temporal_transformer": 397620480,
+    "trainable_pct": 26.079919994284857,
+    "overall_by_category": {
+      "other": 128726442,
+      "spatial_transformer": 248798400,
+      "temporal_transformer": 397620480,
+      "spatial_resnet": 537670400,
+      "temporal_resnet": 159270720,
+      "sampler_conv": 52536640
+    },
+    "by_block": {
+      "conv_in": {
+        "other": 23360,
+        "total": 23360
+      },
+      "time_and_added_cond_embeddings": {
+        "other": 4674560,
+        "total": 4674560
+      },
+      "down_blocks.0": {
+        "other": 2053764,
+        "total": 22018884,
+        "spatial_transformer": 5008000,
+        "temporal_transformer": 7472640,
+        "spatial_resnet": 4510080,
+        "temporal_resnet": 2052480,
+        "sampler_conv": 921920
+      },
+      "down_blocks.1": {
+        "other": 8203524,
+        "total": 77829764,
+        "spatial_transformer": 17388800,
+        "temporal_transformer": 27233280,
+        "spatial_resnet": 14754560,
+        "temporal_resnet": 6562560,
+        "sampler_conv": 3687040
+      },
+      "down_blocks.2": {
+        "other": 32791044,
+        "total": 294104324,
+        "spatial_transformer": 64268800,
+        "temporal_transformer": 103618560,
+        "spatial_resnet": 55723520,
+        "temporal_resnet": 22955520,
+        "sampler_conv": 14746880
+      },
+      "down_blocks.3": {
+        "spatial_resnet": 62277120,
+        "total": 85232642,
+        "temporal_resnet": 22955520,
+        "other": 2
+      },
+      "up_blocks.0": {
+        "spatial_resnet": 147494400,
+        "total": 196674563,
+        "temporal_resnet": 34433280,
+        "other": 3,
+        "sampler_conv": 14746880
+      },
+      "up_blocks.1": {
+        "other": 49186566,
+        "total": 489498886,
+        "spatial_transformer": 96403200,
+        "temporal_transformer": 155427840,
+        "spatial_resnet": 139301120,
+        "temporal_resnet": 34433280,
+        "sampler_conv": 14746880
+      },
+      "up_blocks.2": {
+        "other": 12305286,
+        "total": 132929926,
+        "spatial_transformer": 26083200,
+        "temporal_transformer": 40849920,
+        "spatial_resnet": 40160640,
+        "temporal_resnet": 9843840,
+        "sampler_conv": 3687040
+      },
+      "up_blocks.3": {
+        "other": 3080646,
+        "total": 36052166,
+        "spatial_transformer": 7512000,
+        "temporal_transformer": 11208960,
+        "spatial_resnet": 11171840,
+        "temporal_resnet": 3078720
+      },
+      "mid_block": {
+        "other": 16395523,
+        "total": 185571843,
+        "spatial_transformer": 32134400,
+        "temporal_transformer": 51809280,
+        "spatial_resnet": 62277120,
+        "temporal_resnet": 22955520
+      },
+      "final_norm_conv_out": {
+        "other": 12164,
+        "total": 12164
+      }
+    },
+    "conv_in_weight_shape": [
+      320,
+      8,
+      3,
+      3
+    ],
+    "conv_out_weight_shape": [
+      4,
+      320,
+      3,
+      3
+    ],
+    "block_out_channels": [
+      320,
+      640,
+      1280,
+      1280
+    ],
+    "num_attention_heads_cfg": [
+      5,
+      10,
+      20,
+      20
+    ],
+    "num_TransformerSpatioTemporalModel": 16,
+    "num_temporal_transformer_blocks": 16,
+    "attention_per_module": {
+      "down_blocks.0": {
+        "channels": 320,
+        "heads": 5,
+        "head_dim": 64,
+        "temporal_heads": 5,
+        "cross_attn_dim": 1024
+      },
+      "down_blocks.1": {
+        "channels": 640,
+        "heads": 10,
+        "head_dim": 64,
+        "temporal_heads": 10,
+        "cross_attn_dim": 1024
+      },
+      "down_blocks.2": {
+        "channels": 1280,
+        "heads": 20,
+        "head_dim": 64,
+        "temporal_heads": 20,
+        "cross_attn_dim": 1024
+      },
+      "up_blocks.1": {
+        "channels": 1280,
+        "heads": 20,
+        "head_dim": 64,
+        "temporal_heads": 20,
+        "cross_attn_dim": 1024
+      },
+      "up_blocks.2": {
+        "channels": 640,
+        "heads": 10,
+        "head_dim": 64,
+        "temporal_heads": 10,
+        "cross_attn_dim": 1024
+      },
+      "up_blocks.3": {
+        "channels": 320,
+        "heads": 5,
+        "head_dim": 64,
+        "temporal_heads": 5,
+        "cross_attn_dim": 1024
+      },
+      "mid_block": {
+        "channels": 1280,
+        "heads": 20,
+        "head_dim": 64,
+        "temporal_heads": 20,
+        "cross_attn_dim": 1024
+      }
+    },
+    "temporal_transformer_block_internals": {
+      "320": {
+        "params": 3736320,
+        "layers": {
+          "norm_in.weight": [
+            320
+          ],
+          "norm_in.bias": [
+            320
+          ],
+          "ff_in.net.0.proj.weight": [
+            2560,
+            320
+          ],
+          "ff_in.net.0.proj.bias": [
+            2560
+          ],
+          "ff_in.net.2.weight": [
+            320,
+            1280
+          ],
+          "ff_in.net.2.bias": [
+            320
+          ],
+          "norm1.weight": [
+            320
+          ],
+          "norm1.bias": [
+            320
+          ],
+          "attn1.to_q.weight": [
+            320,
+            320
+          ],
+          "attn1.to_k.weight": [
+            320,
+            320
+          ],
+          "attn1.to_v.weight": [
+            320,
+            320
+          ],
+          "attn1.to_out.0.weight": [
+            320,
+            320
+          ],
+          "attn1.to_out.0.bias": [
+            320
+          ],
+          "norm2.weight": [
+            320
+          ],
+          "norm2.bias": [
+            320
+          ],
+          "attn2.to_q.weight": [
+            320,
+            320
+          ],
+          "attn2.to_k.weight": [
+            320,
+            1024
+          ],
+          "attn2.to_v.weight": [
+            320,
+            1024
+          ],
+          "attn2.to_out.0.weight": [
+            320,
+            320
+          ],
+          "attn2.to_out.0.bias": [
+            320
+          ],
+          "norm3.weight": [
+            320
+          ],
+          "norm3.bias": [
+            320
+          ],
+          "ff.net.0.proj.weight": [
+            2560,
+            320
+          ],
+          "ff.net.0.proj.bias": [
+            2560
+          ],
+          "ff.net.2.weight": [
+            320,
+            1280
+          ],
+          "ff.net.2.bias": [
+            320
+          ]
+        }
+      },
+      "640": {
+        "params": 13616640,
+        "layers": {
+          "norm_in.weight": [
+            640
+          ],
+          "norm_in.bias": [
+            640
+          ],
+          "ff_in.net.0.proj.weight": [
+            5120,
+            640
+          ],
+          "ff_in.net.0.proj.bias": [
+            5120
+          ],
+          "ff_in.net.2.weight": [
+            640,
+            2560
+          ],
+          "ff_in.net.2.bias": [
+            640
+          ],
+          "norm1.weight": [
+            640
+          ],
+          "norm1.bias": [
+            640
+          ],
+          "attn1.to_q.weight": [
+            640,
+            640
+          ],
+          "attn1.to_k.weight": [
+            640,
+            640
+          ],
+          "attn1.to_v.weight": [
+            640,
+            640
+          ],
+          "attn1.to_out.0.weight": [
+            640,
+            640
+          ],
+          "attn1.to_out.0.bias": [
+            640
+          ],
+          "norm2.weight": [
+            640
+          ],
+          "norm2.bias": [
+            640
+          ],
+          "attn2.to_q.weight": [
+            640,
+            640
+          ],
+          "attn2.to_k.weight": [
+            640,
+            1024
+          ],
+          "attn2.to_v.weight": [
+            640,
+            1024
+          ],
+          "attn2.to_out.0.weight": [
+            640,
+            640
+          ],
+          "attn2.to_out.0.bias": [
+            640
+          ],
+          "norm3.weight": [
+            640
+          ],
+          "norm3.bias": [
+            640
+          ],
+          "ff.net.0.proj.weight": [
+            5120,
+            640
+          ],
+          "ff.net.0.proj.bias": [
+            5120
+          ],
+          "ff.net.2.weight": [
+            640,
+            2560
+          ],
+          "ff.net.2.bias": [
+            640
+          ]
+        }
+      },
+      "1280": {
+        "params": 51809280,
+        "layers": {
+          "norm_in.weight": [
+            1280
+          ],
+          "norm_in.bias": [
+            1280
+          ],
+          "ff_in.net.0.proj.weight": [
+            10240,
+            1280
+          ],
+          "ff_in.net.0.proj.bias": [
+            10240
+          ],
+          "ff_in.net.2.weight": [
+            1280,
+            5120
+          ],
+          "ff_in.net.2.bias": [
+            1280
+          ],
+          "norm1.weight": [
+            1280
+          ],
+          "norm1.bias": [
+            1280
+          ],
+          "attn1.to_q.weight": [
+            1280,
+            1280
+          ],
+          "attn1.to_k.weight": [
+            1280,
+            1280
+          ],
+          "attn1.to_v.weight": [
+            1280,
+            1280
+          ],
+          "attn1.to_out.0.weight": [
+            1280,
+            1280
+          ],
+          "attn1.to_out.0.bias": [
+            1280
+          ],
+          "norm2.weight": [
+            1280
+          ],
+          "norm2.bias": [
+            1280
+          ],
+          "attn2.to_q.weight": [
+            1280,
+            1280
+          ],
+          "attn2.to_k.weight": [
+            1280,
+            1024
+          ],
+          "attn2.to_v.weight": [
+            1280,
+            1024
+          ],
+          "attn2.to_out.0.weight": [
+            1280,
+            1280
+          ],
+          "attn2.to_out.0.bias": [
+            1280
+          ],
+          "norm3.weight": [
+            1280
+          ],
+          "norm3.bias": [
+            1280
+          ],
+          "ff.net.0.proj.weight": [
+            10240,
+            1280
+          ],
+          "ff.net.0.proj.bias": [
+            10240
+          ],
+          "ff.net.2.weight": [
+            1280,
+            5120
+          ],
+          "ff.net.2.bias": [
+            1280
+          ]
+        }
+      }
+    },
+    "input_assumption": {
+      "frames": 9,
+      "width_px": 640,
+      "height_px": 896,
+      "latent_h": 112,
+      "latent_w": 80
+    },
+    "feature_maps": {
+      "input_latent": {
+        "c": 8,
+        "h": 112,
+        "w": 80
+      },
+      "conv_in_out": {
+        "c": 320,
+        "h": 112,
+        "w": 80
+      },
+      "down_block_0": {
+        "c": 320,
+        "h_during_block": 112,
+        "w_during_block": 80,
+        "c_out": 320,
+        "h_out": 56,
+        "w_out": 40,
+        "type": "CrossAttnDownBlockSpatioTemporal"
+      },
+      "down_block_1": {
+        "c": 640,
+        "h_during_block": 56,
+        "w_during_block": 40,
+        "c_out": 640,
+        "h_out": 28,
+        "w_out": 20,
+        "type": "CrossAttnDownBlockSpatioTemporal"
+      },
+      "down_block_2": {
+        "c": 1280,
+        "h_during_block": 28,
+        "w_during_block": 20,
+        "c_out": 1280,
+        "h_out": 14,
+        "w_out": 10,
+        "type": "CrossAttnDownBlockSpatioTemporal"
+      },
+      "down_block_3": {
+        "c": 1280,
+        "h_during_block": 14,
+        "w_during_block": 10,
+        "c_out": 1280,
+        "h_out": 14,
+        "w_out": 10,
+        "type": "DownBlockSpatioTemporal"
+      },
+      "mid_block": {
+        "c": 1280,
+        "h": 14,
+        "w": 10
+      },
+      "up_block_0": {
+        "c": 1280,
+        "h_during_block": 14,
+        "w_during_block": 10,
+        "type": "UpBlockSpatioTemporal",
+        "h_out": 28,
+        "w_out": 20
+      },
+      "up_block_1": {
+        "c": 1280,
+        "h_during_block": 28,
+        "w_during_block": 20,
+        "type": "CrossAttnUpBlockSpatioTemporal",
+        "h_out": 56,
+        "w_out": 40
+      },
+      "up_block_2": {
+        "c": 640,
+        "h_during_block": 56,
+        "w_during_block": 40,
+        "type": "CrossAttnUpBlockSpatioTemporal",
+        "h_out": 112,
+        "w_out": 80
+      },
+      "up_block_3": {
+        "c": 320,
+        "h_during_block": 112,
+        "w_during_block": 80,
+        "type": "CrossAttnUpBlockSpatioTemporal",
+        "h_out": 112,
+        "w_out": 80
+      },
+      "output": {
+        "c": 4,
+        "h": 112,
+        "w": 80
+      }
+    }
+  },
+  "vae": {
+    "total": 97742847,
+    "encoder": 34163592,
+    "decoder": 63579183,
+    "other": 72,
+    "block_out_channels": [
+      128,
+      256,
+      512,
+      512
+    ],
+    "latent_channels": 4,
+    "scaling_factor": 0.18215,
+    "spatial_downsample_factor": 8
+  },
+  "clip": {
+    "total": 632076800,
+    "hidden_size": 1280,
+    "layers": 32,
+    "heads": 16,
+    "patch_size": 14,
+    "image_size": 224,
+    "num_tokens": 257,
+    "num_patches": 256,
+    "projection_dim": 1024,
+    "intermediate_size": 5120
+  },
+  "torch": "2.15.0"
+}

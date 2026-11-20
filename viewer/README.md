@@ -23,6 +23,7 @@ It must be served over http (the page fetches `stacks/index.json`); opening `ind
 | `real_scene` | real smartphone focal stack from the dataset (a test scene) |
 | `authors_in4`, `authors_in1`, `authors_in7` | authors' 200k checkpoint output from one input frame (position 4 / 1 / 7); 180x252 crops from our evaluation contact sheets |
 | `ours_random_in4` | our 4,000-step arm A (`random`), same scene, input position 4 |
+| `ours_armA_chess` | our arm A retrained on 2026-11-20 (same recipe, 4,000 steps), full-size 640x896 frames generated from one input frame (position 4) of a test scene |
 | `blender_macro`, `blender_garden`, `blender_still_life` | Cycles thin-lens renders of CC0 Poly Haven assets (`blender/make_scene.py`) |
 
 You can also use **Upload 9 frames** to pick nine same-sized images; they are used in file-name order (first = nearest).
@@ -39,4 +40,4 @@ This needs a GPU (about 25 GB VRAM, about 65 s per image on an A100) and is not 
 
 - Position-to-distance spacing is not documented by the authors; only the near-to-far order is reliable.
 - Low-texture regions (walls, sky) have almost flat sharpness curves, so the choice there is unreliable; the viewer warns when this happens.
-- The authors' model outputs here are small crops (180x252) taken from our evaluation sheets; regenerate full-size frames on a GPU for a sharper demo.
+- The `authors_*` and `ours_random_in4` stacks are small crops (180x252) taken from our evaluation sheets; `ours_armA_chess` is full size (generated with `scripts/infer_stacks.py`).
